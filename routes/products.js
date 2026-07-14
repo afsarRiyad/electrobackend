@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { products } from "../data/products.js";
+import { Product } from "../utils/models.js";
 import {
   findProduct,
   getBrands,
@@ -10,18 +10,22 @@ import {
 
 const router = Router();
 
-router.get("/products", (req, res) => {
-  res.json(queryProducts(req.query));
+router.get("/products", async (req, res) => {
+  res.json(await queryProducts(req.query));
 });
 
-router.get("/products/featured", (req, res) => {
-  res.json({
-    data: products.filter((product) => product.tags.includes("featured")),
-  });
+router.get("/products/featured", async (req, res) => {
+  try {
+    const featuredProducts = await Product.find({ tags: "featured" });
+    res.json({ data: featuredProducts });
+  } catch (error) {
+    console.error("Error fetching featured products:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
-router.get("/products/:idOrSlug", (req, res) => {
-  const product = findProduct(req.params.idOrSlug);
+router.get("/products/:idOrSlug", async (req, res) => {
+  const product = await findProduct(req.params.idOrSlug);
 
   if (!product) {
     return res.status(404).json({
@@ -32,16 +36,16 @@ router.get("/products/:idOrSlug", (req, res) => {
   return res.json({ data: product });
 });
 
-router.get("/categories", (req, res) => {
-  res.json({ data: getCategories() });
+router.get("/categories", async (req, res) => {
+  res.json({ data: await getCategories() });
 });
 
-router.get("/brands", (req, res) => {
-  res.json({ data: getBrands() });
+router.get("/brands", async (req, res) => {
+  res.json({ data: await getBrands() });
 });
 
-router.get("/home-v3", (req, res) => {
-  res.json({ data: getHomeV3Payload() });
+router.get("/home-v3", async (req, res) => {
+  res.json({ data: await getHomeV3Payload() });
 });
 
 export default router;
