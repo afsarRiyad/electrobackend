@@ -8,7 +8,9 @@ import dotenv from "dotenv";
 import { connectDB } from "./utils/db.js";
 
 dotenv.config();
+console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 const app = express();
+console.log("🚀 index.js started");
 
 app.use(
   cors({
@@ -37,7 +39,10 @@ app.get("/", (req, res) => {
       auth: {
         signup: "POST /api/auth/signup",
         login: "POST /api/auth/login",
-        me: "GET /api/auth/me (Protected)"
+        me: "GET /api/auth/me (Protected)",
+        forgotPassword: "POST /api/auth/forgot-password",
+        resetPassword: "POST /api/auth/reset-password",
+        changePassword: "PUT /api/auth/change-password (Protected)"
       },
       wishlist: {
         get: "GET /api/wishlist (Protected)",
