@@ -4,7 +4,17 @@ import { homeV3Sections } from "../data/products.js";
 
 const normalize = (value = "") => value.toString().trim().toLowerCase();
 
+let cachedCategories = null;
+let cachedBrands = null;
+
+export const clearProductCache = () => {
+  cachedCategories = null;
+  cachedBrands = null;
+};
+
 export const getCategories = async () => {
+  if (cachedCategories) return cachedCategories;
+  
   try {
     const categories = await Product.aggregate([
       { $unwind: "$categories" },
@@ -12,6 +22,7 @@ export const getCategories = async () => {
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
     ]);
+    cachedCategories = categories;
     return categories;
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -20,12 +31,15 @@ export const getCategories = async () => {
 };
 
 export const getBrands = async () => {
+  if (cachedBrands) return cachedBrands;
+  
   try {
     const brands = await Product.aggregate([
       { $group: { _id: "$brand", count: { $sum: 1 } } },
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
     ]);
+    cachedBrands = brands;
     return brands;
   } catch (error) {
     console.error("Error fetching brands:", error);
@@ -41,19 +55,19 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      const product = await Product.findById(idOrSlug);
+      const product = await Product.findById(idOrSlug).lean();
       if (product) return product;
     }
 
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      const product = await Product.findOne({ id: numericId });
+      const product = await Product.findOne({ id: numericId }).lean();
       if (product) return product;
     }
     
     // 3. Fallback to slug match
-    return await Product.findOne({ slug: normalized.toLowerCase() });
+    return await Product.findOne({ slug: normalized.toLowerCase() }).lean();
   } catch (error) {
     console.error(`Error finding product ${idOrSlug}:`, error);
     return null;
@@ -150,11 +164,14 @@ export const queryProducts = async (query = {}) => {
   }
 
   try {
-    const total = await Product.countDocuments(filter);
-    const data = await Product.find(filter)
-      .sort(sortObj)
-      .skip((currentPage - 1) * perPage)
-      .limit(perPage);
+    const [total, data] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter)
+        .sort(sortObj)
+        .skip((currentPage - 1) * perPage)
+        .limit(perPage)
+        .lean()
+    ]);
 
     return {
       data,
@@ -183,21 +200,24 @@ export const queryProducts = async (query = {}) => {
 
 export const getHomeV3Payload = async () => {
   try {
-    const heroDeals = await Product.find({ tags: "top-rated" }).limit(3);
-    const categories = await getCategories();
-    
-    const sections = [];
-    for (const section of homeV3Sections) {
-      const products = [];
-      for (const id of section.productIds) {
-        const prod = await findProduct(id);
-        if (prod) products.push(prod);
-      }
-      sections.push({
-        ...section,
-        products,
-      });
-    }
+    // Collect all unique product IDs from homeV3Sections
+    const allProductIds = [...new Set(homeV3Sections.flatMap((section) => section.productIds))];
+
+    // Fetch heroDeals, categories, and all section products in parallel
+    const [heroDeals, categories, productsInDb] = await Promise.all([
+      Product.find({ tags: "top-rated" }).limit(3).lean(),
+      getCategories(),
+      Product.find({ id: { $in: allProductIds } }).lean(),
+    ]);
+
+    // Map database results by their product "id" for O(1) retrieval
+    const productMap = new Map(productsInDb.map((p) => [p.id, p]));
+
+    // Construct home v3 sections synchronously
+    const sections = homeV3Sections.map((section) => ({
+      ...section,
+      products: section.productIds.map((id) => productMap.get(id)).filter(Boolean),
+    }));
 
     return {
       heroDeals,

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Product } from "./models.js";
 import { products } from "../data/products.js";
+import { clearProductCache } from "./productQueries.js";
 
 export const connectDB = async () => {
   try {
@@ -9,15 +10,17 @@ export const connectDB = async () => {
     await mongoose.connect(connUri);
     console.log("MongoDB Connected successfully.");
 
-    // Sync products to database (upsert)
+    // Sync products to database (upsert via bulkWrite)
     console.log("Synchronizing products list with MongoDB...");
-    for (const productData of products) {
-      await Product.updateOne(
-        { id: productData.id },
-        { $set: productData },
-        { upsert: true }
-      );
-    }
+    const bulkOps = products.map((productData) => ({
+      updateOne: {
+        filter: { id: productData.id },
+        update: { $set: productData },
+        upsert: true,
+      },
+    }));
+    await Product.bulkWrite(bulkOps);
+    clearProductCache();
     console.log(`Successfully synchronized ${products.length} products to MongoDB.`);
   } catch (error) {
     console.error("Error connecting to MongoDB:", error.message);
