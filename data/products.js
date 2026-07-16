@@ -747,4 +747,9 @@ export const homeV3Sections = [
     title: "Television Entertainment",
     productIds: [3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, 3011, 3012, 3013, 3014, 3015],
   },
+  {
+    id: "laptops-and-computers",
+    title: "Laptops & Computers",
+    productIds: [2606, 2717, 2860, 2613, 2609, 2619],
+  },
 ];
