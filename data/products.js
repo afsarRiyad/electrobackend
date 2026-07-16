@@ -463,7 +463,7 @@ export const products = [
     rating: 4.8,
     reviews: 15,
     stock: 12,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/smart-tv-4k-uhd-55-inch/",
     description: "A gorgeous 55-inch smart TV with stunning 4K UHD resolution."
   },
@@ -481,7 +481,7 @@ export const products = [
     rating: 4.9,
     reviews: 32,
     stock: 5,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/oled-smart-tv-65-inch-thinq/",
     description: "Experience infinite contrast and deep blacks with this premium 65-inch OLED TV."
   },
@@ -499,7 +499,7 @@ export const products = [
     rating: 4.6,
     reviews: 20,
     stock: 8,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/qled-ultra-hd-smart-tv-50-inch/",
     description: "Vibrant QLED colors and smart hub features in a compact 50-inch frame."
   },
@@ -517,7 +517,7 @@ export const products = [
     rating: 4.4,
     reviews: 14,
     stock: 20,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/crystal-uhd-smart-tv-43-inch/",
     description: "Clear and vivid 43-inch smart TV, perfect for bedrooms or smaller rooms."
   },
@@ -535,7 +535,7 @@ export const products = [
     rating: 4.5,
     reviews: 18,
     stock: 14,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/hisense-u7-mini-led-55-inch/",
     description: "ULED Mini-LED TV with smooth Google TV interface and gaming mode."
   },
@@ -553,7 +553,7 @@ export const products = [
     rating: 4.6,
     reviews: 24,
     stock: 9,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/tcl-q-class-4k-uhd-65-inch/",
     description: "High-contrast HDR QLED TV featuring immersive sound and Google TV."
   },
@@ -571,7 +571,7 @@ export const products = [
     rating: 4.9,
     reviews: 45,
     stock: 4,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2021/03/tv-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/sony-bravia-xr-oled-65-inch/",
     description: "Premium OLED panel powered by the Cognitive Processor XR."
   },
@@ -589,7 +589,7 @@ export const products = [
     rating: 4.8,
     reviews: 58,
     stock: 35,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/apple-tv-4k-wi-fi-64gb/",
     description: "The ultimate streaming box with 4K Dolby Vision, HDR10+, and Siri Remote."
   },
@@ -607,7 +607,7 @@ export const products = [
     rating: 4.7,
     reviews: 42,
     stock: 40,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/roku-ultra-streaming-device-4k/",
     description: "Our fastest and most powerful player with a hands-free voice remote."
   },
@@ -625,7 +625,7 @@ export const products = [
     rating: 4.8,
     reviews: 38,
     stock: 7,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/sonos-arc-smart-soundbar-dolby-atmos/",
     description: "Bring all your entertainment to life with the extraordinarily realistic sound of Arc."
   },
@@ -643,7 +643,7 @@ export const products = [
     rating: 4.7,
     reviews: 29,
     stock: 10,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/bose-smart-soundbar-900-atmos/",
     description: "It is the most immersive Bose voice-controlled smart soundbar yet."
   },
@@ -661,7 +661,7 @@ export const products = [
     rating: 4.6,
     reviews: 16,
     stock: 6,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/sony-ht-a7000-dolby-atmos-soundbar/",
     description: "Discover a whole new level of immersion with surround sound engineered by Sony."
   },
@@ -679,7 +679,7 @@ export const products = [
     rating: 4.9,
     reviews: 12,
     stock: 3,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/sennheiser-ambeo-soundbar-max-3d/",
     description: "The world's best cinematic soundbar from a single 3D audio home system."
   },
@@ -697,7 +697,7 @@ export const products = [
     rating: 4.5,
     reviews: 22,
     stock: 12,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/denon-avr-s760h-7-2-channel-receiver/",
     description: "Power your home theater with 75W per channel and 3 dedicated 8K HDMI inputs."
   },
@@ -715,7 +715,7 @@ export const products = [
     rating: 4.8,
     reviews: 64,
     stock: 18,
-    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+    image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
     productUrl: "https://electro.madrasthemes.com/product/nvidia-shield-tv-pro-4k-hdr/",
     description: "The ultimate Android TV streaming media player for tech enthusiasts."
   }
