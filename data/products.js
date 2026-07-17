@@ -730,7 +730,7 @@ export const homeV3Sections = [
   {
     id: "top-selling",
     title: "Top Selling",
-    productIds: [2625, 2630, 2860, 2439, 2715, 2603],
+    productIds: [2625, 2630, 2860, 2439, 2715, 2603, 2608],
   },
   {
     id: "on-sale",
