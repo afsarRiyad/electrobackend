@@ -97,7 +97,7 @@ router.get("/", ...guard, async (req, res) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      // Top products (by order item quantity)
+      // Top products (by order item quantity) - optimized to avoid $lookup
       Order.aggregate([
         { $unwind: "$items" },
         {
@@ -110,23 +110,6 @@ router.get("/", ...guard, async (req, res) => {
         },
         { $sort: { totalSold: -1 } },
         { $limit: 5 },
-        {
-          $lookup: {
-            from: "products",
-            localField: "_id",
-            foreignField: "_id",
-            as: "product",
-          },
-        },
-        {
-          $project: {
-            productName: 1,
-            totalSold: 1,
-            totalRevenue: 1,
-            image: { $arrayElemAt: ["$product.image", 0] },
-            sku: { $arrayElemAt: ["$product.sku", 0] },
-          },
-        },
       ]),
 
       Order.find()

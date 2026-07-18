@@ -16,7 +16,9 @@ router.get("/products", async (req, res) => {
 
 router.get("/products/featured", async (req, res) => {
   try {
-    const featuredProducts = await Product.find({ tags: "featured" });
+    const featuredProducts = await Product.find({ tags: "featured" })
+      .limit(20)
+      .lean();
     res.json({ data: featuredProducts });
   } catch (error) {
     console.error("Error fetching featured products:", error);

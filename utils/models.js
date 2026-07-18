@@ -19,9 +19,16 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpire: { type: Date, default: null },
+    recentlyViewed: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
   },
   { timestamps: true }
 );
+
+// User indexes
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
+userSchema.index({ status: 1 });
+userSchema.index({ role: 1 });
 
 // ─── PRODUCT ─────────────────────────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
@@ -52,6 +59,15 @@ productSchema.index({ name: "text", brand: "text", sku: "text" });
 productSchema.index({ categories: 1 });
 productSchema.index({ isActive: 1 });
 productSchema.index({ stock: 1 });
+productSchema.index({ price: 1 });
+productSchema.index({ rating: -1 });
+productSchema.index({ brand: 1 });
+productSchema.index({ tags: 1 });
+productSchema.index({ createdAt: -1 });
+// Compound indexes for common query patterns
+productSchema.index({ isActive: 1, stock: 1 });
+productSchema.index({ categories: 1, isActive: 1 });
+productSchema.index({ brand: 1, isActive: 1 });
 
 // ─── WISHLIST ─────────────────────────────────────────────────────────────────
 const wishlistSchema = new mongoose.Schema(
@@ -151,11 +167,16 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate order number before saving
+// Auto-generate order number before saving using atomic counter
 orderSchema.pre("save", async function (next) {
   if (!this.orderNumber) {
-    const count = await mongoose.model("Order").countDocuments();
-    this.orderNumber = `ORD-${String(count + 1).padStart(6, "0")}`;
+    const Counter = mongoose.model("Counter");
+    const counter = await Counter.findOneAndUpdate(
+      { name: "orderNumber" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    this.orderNumber = `ORD-${String(counter.seq).padStart(6, "0")}`;
   }
   next();
 });
@@ -163,8 +184,14 @@ orderSchema.pre("save", async function (next) {
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ customer: 1 });
+orderSchema.index({ customerEmail: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ orderNumber: 1 });
+// Compound indexes for common query patterns
+orderSchema.index({ customerEmail: 1, status: 1 });
+orderSchema.index({ customerEmail: 1, createdAt: -1 });
+orderSchema.index({ status: 1, paymentStatus: 1 });
+orderSchema.index({ paymentMethod: 1, paymentStatus: 1 });
 
 // ─── INVENTORY ────────────────────────────────────────────────────────────────
 const inventoryHistorySchema = new mongoose.Schema(
@@ -198,6 +225,16 @@ const inventorySchema = new mongoose.Schema(
 inventorySchema.index({ quantity: 1 });
 inventorySchema.index({ product: 1 });
 
+// ─── COUNTER ─────────────────────────────────────────────────────────────────
+const counterSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, unique: true },
+    seq: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+counterSchema.index({ name: 1 });
+
 export const User = mongoose.model("User", userSchema);
 export const Product = mongoose.model("Product", productSchema);
 export const Wishlist = mongoose.model("Wishlist", wishlistSchema);
@@ -205,3 +242,4 @@ export const Compare = mongoose.model("Compare", compareSchema);
 export const Customer = mongoose.model("Customer", customerSchema);
 export const Order = mongoose.model("Order", orderSchema);
 export const Inventory = mongoose.model("Inventory", inventorySchema);
+export const Counter = mongoose.model("Counter", counterSchema);

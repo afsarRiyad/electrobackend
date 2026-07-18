@@ -1,15 +1,19 @@
 import { Router } from "express";
-import { Product } from "../../utils/models.js";
+import { Product, Counter } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
 
-// Helper: generate a numeric ID (max existing + 1)
+// Helper: generate a numeric ID using atomic counter
 const getNextProductId = async () => {
-  const last = await Product.findOne().sort({ id: -1 }).lean();
-  return last ? last.id + 1 : 1;
+  const counter = await Counter.findOneAndUpdate(
+    { name: "productId" },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.seq;
 };
 
 // Helper: generate slug from name
@@ -76,7 +80,7 @@ router.get("/", ...guard, async (req, res) => {
 // ─── GET /api/admin/products/:id ──────────────────────────────────────────────
 router.get("/:id", ...guard, async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).lean();
+    const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
     return res.json({ data: product });
   } catch (err) {

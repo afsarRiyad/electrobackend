@@ -1,12 +1,15 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import compression from "compression";
 
 // ─── Existing routes ──────────────────────────────────────────────────────────
 import productRoutes from "./routes/products.js";
 import authRoutes from "./routes/auth.js";
 import wishlistRoutes from "./routes/wishlist.js";
 import compareRoutes from "./routes/compare.js";
+import orderRoutes from "./routes/orders.js";
+import userRoutes from "./routes/user.js";
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 import adminAuthRoutes from "./routes/admin/adminAuth.js";
@@ -35,6 +38,7 @@ app.use(
 
 const port = process.env.PORT || 5000;
 app.use(express.json());
+app.use(compression());
 
 // Connect to MongoDB
 connectDB();
@@ -71,6 +75,24 @@ app.get("/", (req, res) => {
         get: "GET /api/compare (Protected)",
         add: "POST /api/compare (Protected)",
         remove: "DELETE /api/compare/:productId (Protected)",
+      },
+      orders: {
+        list: "GET /api/orders (Protected)",
+        get: "GET /api/orders/:id (Protected)",
+        create: "POST /api/orders (Protected)",
+        update: "PUT /api/orders/:id (Protected)",
+        cancel: "PATCH /api/orders/:id/cancel (Protected)",
+        stats: "GET /api/orders/stats/summary (Protected)",
+      },
+      user: {
+        profile: "GET /api/user/profile (Protected)",
+        updateProfile: "PUT /api/user/profile (Protected)",
+        orders: "GET /api/user/orders (Protected)",
+        recentlyViewed: {
+          get: "GET /api/user/recently-viewed (Protected)",
+          add: "POST /api/user/recently-viewed (Protected)",
+          remove: "DELETE /api/user/recently-viewed/:productId (Protected)",
+        },
       },
       // Admin Dashboard
       admin: {
@@ -139,6 +161,8 @@ app.use("/api", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", wishlistRoutes);
 app.use("/api", compareRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/user", userRoutes);
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", adminAuthRoutes);
