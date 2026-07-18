@@ -13,6 +13,41 @@ const generateToken = (id) => {
   });
 };
 
+// Validation helpers
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+  if (password.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one uppercase letter" };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one number" };
+  }
+  return { valid: true };
+};
+
+const validateUsername = (username) => {
+  if (username.length < 3) {
+    return { valid: false, message: "Username must be at least 3 characters" };
+  }
+  if (username.length > 20) {
+    return { valid: false, message: "Username must be less than 20 characters" };
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return { valid: false, message: "Username can only contain letters, numbers, and underscores" };
+  }
+  return { valid: true };
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 // @access  Public
@@ -22,6 +57,23 @@ router.post("/signup", async (req, res) => {
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Please fill all fields" });
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Validate username
+    const usernameValidation = validateUsername(username.trim());
+    if (!usernameValidation.valid) {
+      return res.status(400).json({ message: usernameValidation.message });
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
     }
 
     // Check if user exists
@@ -120,6 +172,11 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(400).json({ message: "Please provide your email" });
     }
 
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
     const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (!user) {
@@ -158,6 +215,12 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Token and new password are required" });
     }
 
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
+
     // Find user by token and check expiration
     const user = await User.findOne({
       resetPasswordToken: token,
@@ -193,6 +256,12 @@ router.put("/change-password", protect, async (req, res) => {
       return res.status(400).json({ message: "Current and new password are required" });
     }
 
+    // Validate new password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
+
     // Find the user (password is not excluded when using findById unless projected out)
     const user = await User.findById(req.user._id);
 
@@ -200,6 +269,12 @@ router.put("/change-password", protect, async (req, res) => {
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Incorrect current password" });
+    }
+
+    // Check if new password is same as current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "New password must be different from current password" });
     }
 
     // Hash and save new password

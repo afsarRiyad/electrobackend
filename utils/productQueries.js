@@ -12,6 +12,39 @@ export const clearProductCache = () => {
   cachedBrands = null;
 };
 
+// Category image mapping
+const categoryImages = {
+  "Audio Speakers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+  "TV & Audio": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+  "Laptops": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+  "Laptops & Computers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+  "Accessories": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/powerbank-300x300.png",
+  "Headphones": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+  "Ultrabooks": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+  "Smart Phones & Tablets": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/GoldPhone-1-300x300.png",
+  "Smartphones": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png",
+  "Game Consoles": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
+  "Video Games & Consoles": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+  "Computer Cases": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+  "Computer Components": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+  "Servers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+  "Power Banks": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/powerbank-300x300.png",
+  "Gadgets": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/watch-300x300.png",
+  "Smartwatches": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/watch-300x300.png",
+  "Headphone Cases": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
+  "Headphone Accessories": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png",
+  "Printers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/printer-300x300.png",
+  "Printers & Ink": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/printer-300x300.png",
+  "Cameras": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/camera2-300x300.png",
+  "Cameras & Photography": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/videocamera-300x300.png",
+  "Mac Computers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+  "Tablets": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+  "Chargers": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+  "Television": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+  "Streaming Devices": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+  "Home Theater Systems": "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
+};
+
 export const getCategories = async () => {
   if (cachedCategories) return cachedCategories;
   
@@ -22,8 +55,15 @@ export const getCategories = async () => {
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
     ]);
-    cachedCategories = categories;
-    return categories;
+    
+    // Add images to categories
+    const categoriesWithImages = categories.map(category => ({
+      ...category,
+      image: categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png"
+    }));
+    
+    cachedCategories = categoriesWithImages;
+    return categoriesWithImages;
   } catch (error) {
     console.error("Error fetching categories:", error);
     return [];
