@@ -22,8 +22,11 @@ import adminCustomerRoutes from "./routes/admin/customers.js";
 import adminPaymentRoutes from "./routes/admin/payments.js";
 import adminInventoryRoutes from "./routes/admin/inventory.js";
 import adminStatsRoutes from "./routes/admin/stats.js";
+import adminInboxRoutes from "./routes/admin/inbox.js";
 
 import { connectDB } from "./utils/db.js";
+import { generalLimiter, authLimiter, adminLimiter, uploadLimiter } from "./utils/rateLimiter.js";
+import { apiCache, productCache, noCache } from "./utils/cacheHeaders.js";
 
 dotenv.config();
 console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
@@ -194,6 +197,19 @@ app.get("/", (req, res) => {
           update: "PUT /api/admin/inventory/:id (Admin)",
           delete: "DELETE /api/admin/inventory/:id (Admin)",
         },
+        inbox: {
+          list: "GET /api/admin/inbox (Admin)",
+          get: "GET /api/admin/inbox/:id (Admin)",
+          send: "POST /api/admin/inbox (Admin)",
+          markRead: "PATCH /api/admin/inbox/:id/read (Admin)",
+          markUnread: "PATCH /api/admin/inbox/:id/unread (Admin)",
+          archive: "PATCH /api/admin/inbox/:id/archive (Admin)",
+          unarchive: "PATCH /api/admin/inbox/:id/unarchive (Admin)",
+          delete: "DELETE /api/admin/inbox/:id (Admin)",
+          archived: "GET /api/admin/inbox/archived/list (Admin)",
+          sent: "GET /api/admin/inbox/sent/list (Admin)",
+          markAllRead: "PATCH /api/admin/inbox/mark-all-read/bulk (Admin)",
+        },
       },
     },
   });
@@ -204,24 +220,25 @@ app.get("/api/health", (req, res) => {
 });
 
 // ─── Existing routes ──────────────────────────────────────────────────────────
-app.use("/api", productRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api", wishlistRoutes);
-app.use("/api", compareRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use("/api", generalLimiter, productCache, productRoutes);
+app.use("/api/auth", authLimiter, noCache, authRoutes);
+app.use("/api", generalLimiter, noCache, wishlistRoutes);
+app.use("/api", generalLimiter, noCache, compareRoutes);
+app.use("/api/orders", generalLimiter, noCache, orderRoutes);
+app.use("/api/user", generalLimiter, noCache, userRoutes);
+app.use("/api/upload", uploadLimiter, noCache, uploadRoutes);
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
-app.use("/api/admin/auth", adminAuthRoutes);
-app.use("/api/admin/users", adminUserRoutes);
-app.use("/api/admin/products", adminProductRoutes);
-app.use("/api/admin/categories", adminCategoryRoutes);
-app.use("/api/admin/product-attributes", adminProductAttributeRoutes);
-app.use("/api/admin/customers", adminCustomerRoutes);
-app.use("/api/admin/payments", adminPaymentRoutes);
-app.use("/api/admin/inventory", adminInventoryRoutes);
-app.use("/api/admin/stats", adminStatsRoutes);
+app.use("/api/admin/auth", authLimiter, noCache, adminAuthRoutes);
+app.use("/api/admin/users", adminLimiter, noCache, adminUserRoutes);
+app.use("/api/admin/products", adminLimiter, noCache, adminProductRoutes);
+app.use("/api/admin/categories", adminLimiter, noCache, adminCategoryRoutes);
+app.use("/api/admin/product-attributes", adminLimiter, noCache, adminProductAttributeRoutes);
+app.use("/api/admin/customers", adminLimiter, noCache, adminCustomerRoutes);
+app.use("/api/admin/payments", adminLimiter, noCache, adminPaymentRoutes);
+app.use("/api/admin/inventory", adminLimiter, noCache, adminInventoryRoutes);
+app.use("/api/admin/stats", adminLimiter, apiCache, adminStatsRoutes);
+app.use("/api/admin/inbox", adminLimiter, noCache, adminInboxRoutes);
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

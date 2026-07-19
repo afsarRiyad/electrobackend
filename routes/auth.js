@@ -5,6 +5,7 @@ import { Router } from "express";
 import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
+import { validateSignup, validateLogin } from "../utils/validation.js";
 
 const router = Router();
 
@@ -52,7 +53,7 @@ const validateUsername = (username) => {
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 // @access  Public
-router.post("/signup", async (req, res) => {
+router.post("/signup", validateSignup, async (req, res) => {
   try {
     const { username, email, password } = req.body || {};
 
@@ -121,7 +122,7 @@ router.post("/signup", async (req, res) => {
 // @desc    Authenticate user & get token (login)
 // @route   POST /api/auth/login
 // @access  Public
-router.post("/login", async (req, res) => {
+router.post("/login", validateLogin, async (req, res) => {
   try {
     const { username, password } = req.body || {}; // username can be email or username (userhandle)
 

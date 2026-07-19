@@ -17,6 +17,7 @@ router.get("/products", async (req, res) => {
 router.get("/products/featured", async (req, res) => {
   try {
     const featuredProducts = await Product.find({ tags: "featured" })
+      .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
       .limit(20)
       .lean();
     res.json({ data: featuredProducts });

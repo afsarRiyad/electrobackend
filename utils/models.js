@@ -438,3 +438,29 @@ productVariantSchema.index({ isActive: 1 });
 export const Category = mongoose.model("Category", categorySchema);
 export const ProductAttribute = mongoose.model("ProductAttribute", productAttributeSchema);
 export const ProductVariant = mongoose.model("ProductVariant", productVariantSchema);
+
+// ─── MESSAGE (INBOX) ─────────────────────────────────────────────────────────────
+const messageSchema = new mongoose.Schema(
+  {
+    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // null if sent to all admins
+    subject: { type: String, required: true, trim: true },
+    body: { type: String, required: true },
+    isRead: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false },
+    priority: { type: String, enum: ["low", "normal", "high", "urgent"], default: "normal" },
+    category: { type: String, enum: ["general", "support", "order", "payment", "other"], default: "general" },
+    relatedOrder: { type: mongoose.Schema.Types.ObjectId, ref: "Order", default: null },
+    replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
+  },
+  { timestamps: true }
+);
+
+messageSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
+messageSchema.index({ sender: 1, createdAt: -1 });
+messageSchema.index({ isRead: 1 });
+messageSchema.index({ priority: 1 });
+messageSchema.index({ category: 1 });
+messageSchema.index({ replyTo: 1 });
+
+export const Message = mongoose.model("Message", messageSchema);

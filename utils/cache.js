@@ -1,25 +1,21 @@
-// Simple in-memory cache for admin stats
-const cache = new Map();
+import { LRUCache } from "lru-cache";
+
+// LRU Cache with size limits and TTL
+const cache = new LRUCache({
+  max: 500, // Maximum number of items
+  ttl: 5 * 60 * 1000, // 5 minutes TTL
+  updateAgeOnGet: true, // Reset TTL on access
+  updateAgeOnHas: true,
+});
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const getCache = (key) => {
-  const item = cache.get(key);
-  if (!item) return null;
-  
-  if (Date.now() > item.expiresAt) {
-    cache.delete(key);
-    return null;
-  }
-  
-  return item.data;
+  return cache.get(key);
 };
 
 export const setCache = (key, data, ttl = CACHE_TTL) => {
-  cache.set(key, {
-    data,
-    expiresAt: Date.now() + ttl,
-  });
+  cache.set(key, data, { ttl });
 };
 
 export const clearCache = (key) => {
@@ -36,4 +32,13 @@ export const clearCachePattern = (pattern) => {
       cache.delete(key);
     }
   }
+};
+
+export const getCacheStats = () => {
+  return {
+    size: cache.size,
+    max: cache.max,
+    calculatedSize: cache.calculatedSize,
+    itemCount: cache.size,
+  };
 };

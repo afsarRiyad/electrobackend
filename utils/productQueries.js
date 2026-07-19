@@ -207,6 +207,7 @@ export const queryProducts = async (query = {}) => {
     const [total, data] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
+        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
@@ -245,9 +246,14 @@ export const getHomeV3Payload = async () => {
 
     // Fetch heroDeals, categories, and all section products in parallel
     const [heroDeals, categories, productsInDb] = await Promise.all([
-      Product.find({ tags: "top-rated" }).limit(3).lean(),
+      Product.find({ tags: "top-rated" })
+        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
+        .limit(3)
+        .lean(),
       getCategories(),
-      Product.find({ id: { $in: allProductIds } }).lean(),
+      Product.find({ id: { $in: allProductIds } })
+        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
+        .lean(),
     ]);
 
     // Map database results by their product "id" for O(1) retrieval
