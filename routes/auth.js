@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Router } from "express";
 import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
+import { sendPasswordResetEmail } from "../utils/email.js";
 
 const router = Router();
 
@@ -191,12 +192,18 @@ router.post("/forgot-password", async (req, res) => {
     user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // In a real application, we would send this token via email.
-    // For the backend clone, we return it in the response for easy integration.
+    // Send password reset email
+    const emailResult = await sendPasswordResetEmail(user.email, resetToken, user.username);
+    
+    if (!emailResult.success) {
+      console.error("Failed to send password reset email:", emailResult.error);
+      // Still return success to avoid exposing email issues to users
+      // Log the error for debugging
+    }
+
     return res.json({
-      message: "Password reset token generated",
-      token: resetToken,
-      info: "In production, this token will be emailed. For cloning purposes, we return it here."
+      message: "Password reset email sent successfully",
+      info: "Please check your email for the password reset link"
     });
   } catch (error) {
     console.error("Forgot password error:", error);
