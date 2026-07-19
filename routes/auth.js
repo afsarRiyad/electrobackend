@@ -54,7 +54,7 @@ const validateUsername = (username) => {
 // @access  Public
 router.post("/signup", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password } = req.body || {};
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Please fill all fields" });
@@ -123,7 +123,7 @@ router.post("/signup", async (req, res) => {
 // @access  Public
 router.post("/login", async (req, res) => {
   try {
-    const { username, password } = req.body; // username can be email or username (userhandle)
+    const { username, password } = req.body || {}; // username can be email or username (userhandle)
 
     if (!username || !password) {
       return res.status(400).json({ message: "Please enter username/email and password" });
@@ -162,12 +162,19 @@ router.get("/me", protect, async (req, res) => {
   return res.json({ data: req.user });
 });
 
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+router.post("/logout", protect, async (req, res) => {
+  return res.json({ message: "Logged out successfully" });
+});
+
 // @desc    Forgot password - Request reset token
 // @route   POST /api/auth/forgot-password
 // @access  Public
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
 
     if (!email) {
       return res.status(400).json({ message: "Please provide your email" });
@@ -216,7 +223,7 @@ router.post("/forgot-password", async (req, res) => {
 // @access  Public
 router.post("/reset-password", async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token, password } = req.body || {};
 
     if (!token || !password) {
       return res.status(400).json({ message: "Token and new password are required" });
@@ -257,7 +264,7 @@ router.post("/reset-password", async (req, res) => {
 // @access  Private
 router.put("/change-password", protect, async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body || {};
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: "Current and new password are required" });

@@ -6,6 +6,49 @@ import { activityMiddleware } from "../utils/activityLog.js";
 
 const router = Router();
 
+// ─── GET /api/orders/track/:orderNumber ─────────────────────────────────────
+// Public order tracking by order number
+router.get("/track/:orderNumber", async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+
+    if (!orderNumber) {
+      return res.status(400).json({ message: "Order number is required" });
+    }
+
+    const order = await Order.findOne({ orderNumber })
+      .populate("items.product", "name image")
+      .lean();
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Return limited info for public tracking
+    return res.json({
+      data: {
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        })),
+        shippingAddress: order.shippingAddress,
+      },
+    });
+  } catch (err) {
+    console.error("Track order error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ─── GET /api/orders ──────────────────────────────────────────────────
 // Get current user's orders
 router.get("/", protect, async (req, res) => {

@@ -9,6 +9,54 @@ import { clearCachePattern } from "../../utils/cache.js";
 const router = Router();
 const guard = [protect, isAdmin];
 
+// ─── GET /api/admin/payments/track/:orderNumber ───────────────────────────────
+// Admin order tracking with full timeline
+router.get("/track/:orderNumber", ...guard, async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+
+    if (!orderNumber) {
+      return res.status(400).json({ message: "Order number is required" });
+    }
+
+    const order = await Order.findOne({ orderNumber })
+      .populate("customer", "name email phone")
+      .populate("items.product", "name image sku")
+      .populate("statusHistory.changedBy", "username email")
+      .lean();
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Calculate time in each status
+    const statusTimeline = order.statusHistory.map((entry, index) => ({
+      ...entry,
+      duration: index > 0 
+        ? Math.floor((new Date(entry.changedAt) - new Date(order.statusHistory[index - 1].changedAt)) / (1000 * 60 * 60))
+        : null,
+    }));
+
+    return res.json({
+      data: {
+        order,
+        timeline: statusTimeline,
+        summary: {
+          totalDuration: order.createdAt 
+            ? Math.floor((new Date() - new Date(order.createdAt)) / (1000 * 60 * 60))
+            : 0,
+          statusChanges: order.statusHistory.length,
+          currentStatus: order.status,
+          paymentStatus: order.paymentStatus,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Admin track order error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ─── GET /api/admin/payments/export ───────────────────────────────────────────
 // Export orders to CSV (must come before /:id route)
 router.get("/export", ...guard, async (req, res) => {

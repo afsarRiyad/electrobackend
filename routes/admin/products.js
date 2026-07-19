@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { Product, Counter } from "../../utils/models.js";
+import { Product, Counter, Category } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
 import { exportProductsToCSV } from "../../utils/export.js";
 import { activityMiddleware } from "../../utils/activityLog.js";
 import { clearCachePattern } from "../../utils/cache.js";
+import { uploadSingle, uploadMultiple, deleteImage, getPublicIdFromUrl } from "../../utils/upload.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
@@ -172,13 +173,22 @@ router.post("/", ...guard, activityMiddleware('create', 'product'), async (req, 
     const {
       name, sku, brand, categories, tags, price, regularPrice, salePrice,
       rating, reviews, stock, image, productUrl, description, isActive, slug,
-    } = req.body;
+      category, customAttributes, metaTitle, metaDescription, metaKeywords,
+    } = req.body || {};
 
     if (!name || price === undefined)
       return res.status(400).json({ message: "name and price are required" });
 
     const nextId = await getNextProductId();
     const finalSlug = slug || `${slugify(name)}-${nextId}`;
+
+    // Validate category if provided
+    if (category) {
+      const categoryExists = await Category.findById(category);
+      if (!categoryExists) {
+        return res.status(400).json({ message: "Category not found" });
+      }
+    }
 
     const existing = await Product.findOne({ $or: [{ slug: finalSlug }, { sku }] });
     if (existing) return res.status(400).json({ message: "Product with this slug or SKU already exists" });
@@ -201,6 +211,11 @@ router.post("/", ...guard, activityMiddleware('create', 'product'), async (req, 
       productUrl,
       description,
       isActive: isActive !== undefined ? isActive : true,
+      category,
+      customAttributes: customAttributes || [],
+      metaTitle,
+      metaDescription,
+      metaKeywords: metaKeywords || [],
     });
 
     // Clear stats cache
@@ -210,6 +225,57 @@ router.post("/", ...guard, activityMiddleware('create', 'product'), async (req, 
   } catch (err) {
     console.error("Create product error:", err);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── POST /api/admin/products/:id/image ────────────────────────────────────────
+// Upload single image for product
+router.post("/:id/image", ...guard, uploadSingle, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    // Delete old image if exists
+    if (product.image) {
+      const oldPublicId = getPublicIdFromUrl(product.image);
+      if (oldPublicId) {
+        await deleteImage(oldPublicId);
+      }
+    }
+
+    // Update product with new image URL
+    product.image = req.file.path;
+    await product.save();
+
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
+    return res.json({ message: "Product image updated", data: { image: product.image } });
+  } catch (err) {
+    console.error("Product image upload error:", err);
+    return res.status(500).json({ message: "Server error during image upload" });
+  }
+});
+
+// ─── POST /api/admin/products/:id/images ───────────────────────────────────────
+// Upload multiple images for product (returns array of URLs)
+router.post("/:id/images", ...guard, uploadMultiple, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const imageUrls = req.files.map(file => file.path);
+
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
+    return res.json({ 
+      message: `${req.files.length} images uploaded successfully`, 
+      data: { images: imageUrls } 
+    });
+  } catch (err) {
+    console.error("Product multiple images upload error:", err);
+    return res.status(500).json({ message: "Server error during image upload" });
   }
 });
 
