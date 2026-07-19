@@ -1,6 +1,5 @@
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -9,18 +8,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure Cloudinary storage for Multer
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "techmart/products",
-    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
-    public_id: (req, file) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      return `product-${uniqueSuffix}`;
-    },
-  },
-});
+// Configure Multer to use memory storage
+const storage = multer.memoryStorage();
 
 // File filter to validate image types
 const fileFilter = (req, file, cb) => {
@@ -43,11 +32,66 @@ const upload = multer({
   },
 });
 
-// Single image upload middleware
-export const uploadSingle = upload.single("image");
+// Helper function to upload buffer to Cloudinary
+const uploadToCloudinary = (buffer, folder = "techmart/products") => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { 
+        folder: folder,
+        allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    ).end(buffer);
+  });
+};
 
-// Multiple images upload middleware
-export const uploadMultiple = upload.array("images", 5);
+// Single image upload middleware with Cloudinary upload
+export const uploadSingle = async (req, res, next) => {
+  upload.single("image")(req, res, async (err) => {
+    if (err) return next(err);
+    
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        req.file.cloudinaryResult = result;
+        req.file.path = result.secure_url;
+        req.file.filename = result.public_id;
+      } catch (error) {
+        return next(error);
+      }
+    }
+    next();
+  });
+};
+
+// Multiple images upload middleware with Cloudinary upload
+export const uploadMultiple = async (req, res, next) => {
+  upload.array("images", 5)(req, res, async (err) => {
+    if (err) return next(err);
+    
+    if (req.files && req.files.length > 0) {
+      try {
+        const uploadPromises = req.files.map(file => 
+          uploadToCloudinary(file.buffer)
+        );
+        const results = await Promise.all(uploadPromises);
+        
+        req.files = req.files.map((file, index) => ({
+          ...file,
+          cloudinaryResult: results[index],
+          path: results[index].secure_url,
+          filename: results[index].public_id,
+        }));
+      } catch (error) {
+        return next(error);
+      }
+    }
+    next();
+  });
+};
 
 // Delete image from Cloudinary
 export const deleteImage = async (publicId) => {
