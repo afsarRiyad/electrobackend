@@ -14,7 +14,8 @@ const generateToken = (id) =>
 // Admin login — verifies role === 'admin'
 router.post("/login", async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.body || {};
+    
     if (!username || !password)
       return res.status(400).json({ message: "Username/email and password are required" });
 
@@ -90,7 +91,7 @@ router.put("/profile", protect, isAdmin, async (req, res) => {
 // Promote any user to admin (admin only)
 router.post("/make-admin", protect, isAdmin, async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
     const user = await User.findByIdAndUpdate(
@@ -111,7 +112,7 @@ router.post("/make-admin", protect, isAdmin, async (req, res) => {
 // Revoke admin role (admin only)
 router.post("/revoke-admin", protect, isAdmin, async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ message: "userId is required" });
     if (userId === String(req.user._id))
       return res.status(400).json({ message: "You cannot revoke your own admin role" });

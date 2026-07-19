@@ -2,9 +2,33 @@ import { Router } from "express";
 import { Order, Customer } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
+import { exportOrdersToCSV } from "../../utils/export.js";
+import { activityMiddleware } from "../../utils/activityLog.js";
+import { clearCachePattern } from "../../utils/cache.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
+
+// ─── GET /api/admin/payments/export ───────────────────────────────────────────
+// Export orders to CSV (must come before /:id route)
+router.get("/export", ...guard, async (req, res) => {
+  try {
+    const filter = {};
+    
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
+    if (req.query.paymentMethod) filter.paymentMethod = req.query.paymentMethod;
+
+    const csv = await exportOrdersToCSV(filter);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=orders.csv');
+    res.send(csv);
+  } catch (err) {
+    console.error("Export orders error:", err);
+    return res.status(500).json({ message: "Server error during export" });
+  }
+});
 
 // ─── GET /api/admin/payments/stats ────────────────────────────────────────────
 // Revenue statistics — defined BEFORE /:id to avoid conflict
@@ -160,7 +184,7 @@ router.get("/:id", ...guard, async (req, res) => {
 });
 
 // ─── POST /api/admin/payments ─────────────────────────────────────────────────
-router.post("/", ...guard, async (req, res) => {
+router.post("/", ...guard, activityMiddleware('create', 'order'), async (req, res) => {
   try {
     const {
       customer,
@@ -208,6 +232,9 @@ router.post("/", ...guard, async (req, res) => {
       });
     }
 
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
     return res.status(201).json({ message: "Order created", data: order });
   } catch (err) {
     console.error("Create order error:", err);
@@ -216,7 +243,7 @@ router.post("/", ...guard, async (req, res) => {
 });
 
 // ─── PUT /api/admin/payments/:id ──────────────────────────────────────────────
-router.put("/:id", ...guard, async (req, res) => {
+router.put("/:id", ...guard, activityMiddleware('update', 'order'), async (req, res) => {
   try {
     const allowed = [
       "customerName", "customerEmail", "items", "subtotal", "discount", "tax",
@@ -234,6 +261,9 @@ router.put("/:id", ...guard, async (req, res) => {
     });
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
     return res.json({ message: "Order updated", data: order });
   } catch (err) {
     console.error("Update order error:", err);
@@ -242,10 +272,14 @@ router.put("/:id", ...guard, async (req, res) => {
 });
 
 // ─── DELETE /api/admin/payments/:id ───────────────────────────────────────────
-router.delete("/:id", ...guard, async (req, res) => {
+router.delete("/:id", ...guard, activityMiddleware('delete', 'order'), async (req, res) => {
   try {
     const order = await Order.findByIdAndDelete(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
+    
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+    
     return res.json({ message: "Order deleted" });
   } catch (err) {
     console.error("Delete order error:", err);
@@ -255,9 +289,9 @@ router.delete("/:id", ...guard, async (req, res) => {
 
 // ─── PATCH /api/admin/payments/:id/status ────────────────────────────────────
 // Quick status / payment-status update
-router.patch("/:id/status", ...guard, async (req, res) => {
+router.patch("/:id/status", ...guard, activityMiddleware('update', 'order'), async (req, res) => {
   try {
-    const { status, paymentStatus } = req.body;
+    const { status, paymentStatus } = req.body || {};
     const updates = {};
     if (status) updates.status = status;
     if (paymentStatus) updates.paymentStatus = paymentStatus;
@@ -267,6 +301,9 @@ router.patch("/:id/status", ...guard, async (req, res) => {
 
     const order = await Order.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Clear stats cache
+    clearCachePattern("admin:stats");
 
     return res.json({ message: "Order status updated", data: order });
   } catch (err) {

@@ -235,6 +235,24 @@ const counterSchema = new mongoose.Schema(
 );
 counterSchema.index({ name: 1 });
 
+// ─── ACTIVITY LOG ─────────────────────────────────────────────────────────────
+const activityLogSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    action: { type: String, required: true }, // create, update, delete, login, logout, etc.
+    entity: { type: String, required: true }, // product, order, customer, user, etc.
+    entityId: { type: mongoose.Schema.Types.ObjectId },
+    details: { type: mongoose.Schema.Types.Mixed, default: {} },
+    ipAddress: { type: String, default: null },
+    userAgent: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+activityLogSchema.index({ user: 1, createdAt: -1 });
+activityLogSchema.index({ entity: 1, entityId: 1 });
+activityLogSchema.index({ action: 1 });
+activityLogSchema.index({ createdAt: -1 });
+
 export const User = mongoose.model("User", userSchema);
 export const Product = mongoose.model("Product", productSchema);
 export const Wishlist = mongoose.model("Wishlist", wishlistSchema);
@@ -243,3 +261,4 @@ export const Customer = mongoose.model("Customer", customerSchema);
 export const Order = mongoose.model("Order", orderSchema);
 export const Inventory = mongoose.model("Inventory", inventorySchema);
 export const Counter = mongoose.model("Counter", counterSchema);
+export const ActivityLog = mongoose.model("ActivityLog", activityLogSchema);

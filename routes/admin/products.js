@@ -2,6 +2,9 @@ import { Router } from "express";
 import { Product, Counter } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
+import { exportProductsToCSV } from "../../utils/export.js";
+import { activityMiddleware } from "../../utils/activityLog.js";
+import { clearCachePattern } from "../../utils/cache.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
@@ -77,6 +80,80 @@ router.get("/", ...guard, async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/products/export ───────────────────────────────────────────
+// Export products to CSV (must come before :id route)
+router.get("/export", ...guard, async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.brand) filter.brand = req.query.brand;
+    if (req.query.category) filter.categories = req.query.category;
+    if (req.query.isActive !== undefined) filter.isActive = req.query.isActive === "true";
+
+    const csv = await exportProductsToCSV(filter);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=products.csv');
+    res.send(csv);
+  } catch (err) {
+    console.error("Export products error:", err);
+    return res.status(500).json({ message: "Server error during export" });
+  }
+});
+
+// ─── PATCH /api/admin/products/bulk-toggle ───────────────────────────────────
+// Bulk toggle isActive (must come before :id route)
+router.patch("/bulk-toggle", ...guard, activityMiddleware('update', 'product'), async (req, res) => {
+  try {
+    const { ids, isActive } = req.body || {};
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Product IDs array is required" });
+    }
+    
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: "isActive boolean is required" });
+    }
+
+    const result = await Product.updateMany(
+      { _id: { $in: ids } },
+      { isActive }
+    );
+
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
+    return res.json({ 
+      message: `Bulk updated ${result.modifiedCount} products`,
+      modifiedCount: result.modifiedCount 
+    });
+  } catch (err) {
+    console.error("Bulk toggle products error:", err);
+    return res.status(500).json({ message: "Server error during bulk update" });
+  }
+});
+
+// ─── DELETE /api/admin/products/bulk-delete ─────────────────────────────────
+// Bulk delete products (must come before :id route)
+router.delete("/bulk-delete", ...guard, activityMiddleware('delete', 'product'), async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Product IDs array is required" });
+    }
+
+    const result = await Product.deleteMany({ _id: { $in: ids } });
+
+    return res.json({ 
+      message: `Bulk deleted ${result.deletedCount} products`,
+      deletedCount: result.deletedCount 
+    });
+  } catch (err) {
+    console.error("Bulk delete products error:", err);
+    return res.status(500).json({ message: "Server error during bulk delete" });
+  }
+});
+
 // ─── GET /api/admin/products/:id ──────────────────────────────────────────────
 router.get("/:id", ...guard, async (req, res) => {
   try {
@@ -90,7 +167,7 @@ router.get("/:id", ...guard, async (req, res) => {
 });
 
 // ─── POST /api/admin/products ─────────────────────────────────────────────────
-router.post("/", ...guard, async (req, res) => {
+router.post("/", ...guard, activityMiddleware('create', 'product'), async (req, res) => {
   try {
     const {
       name, sku, brand, categories, tags, price, regularPrice, salePrice,
@@ -126,6 +203,9 @@ router.post("/", ...guard, async (req, res) => {
       isActive: isActive !== undefined ? isActive : true,
     });
 
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
     return res.status(201).json({ message: "Product created", data: product });
   } catch (err) {
     console.error("Create product error:", err);
@@ -134,7 +214,7 @@ router.post("/", ...guard, async (req, res) => {
 });
 
 // ─── PUT /api/admin/products/:id ──────────────────────────────────────────────
-router.put("/:id", ...guard, async (req, res) => {
+router.put("/:id", ...guard, activityMiddleware('update', 'product'), async (req, res) => {
   try {
     const allowed = [
       "name", "sku", "brand", "categories", "tags", "price", "regularPrice",
@@ -152,6 +232,9 @@ router.put("/:id", ...guard, async (req, res) => {
     });
     if (!product) return res.status(404).json({ message: "Product not found" });
 
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+
     return res.json({ message: "Product updated", data: product });
   } catch (err) {
     console.error("Update product error:", err);
@@ -160,10 +243,14 @@ router.put("/:id", ...guard, async (req, res) => {
 });
 
 // ─── DELETE /api/admin/products/:id ───────────────────────────────────────────
-router.delete("/:id", ...guard, async (req, res) => {
+router.delete("/:id", ...guard, activityMiddleware('delete', 'product'), async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
+    
+    // Clear stats cache
+    clearCachePattern("admin:stats");
+    
     return res.json({ message: "Product deleted" });
   } catch (err) {
     console.error("Delete product error:", err);
@@ -175,7 +262,7 @@ router.delete("/:id", ...guard, async (req, res) => {
 // Quick stock update without touching other fields
 router.patch("/:id/stock", ...guard, async (req, res) => {
   try {
-    const { stock } = req.body;
+    const { stock } = req.body || {};
     if (stock === undefined || stock < 0)
       return res.status(400).json({ message: "Valid stock value required" });
 
@@ -195,7 +282,7 @@ router.patch("/:id/stock", ...guard, async (req, res) => {
 
 // ─── PATCH /api/admin/products/:id/toggle ─────────────────────────────────────
 // Toggle isActive
-router.patch("/:id/toggle", ...guard, async (req, res) => {
+router.patch("/:id/toggle", ...guard, activityMiddleware('update', 'product'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });

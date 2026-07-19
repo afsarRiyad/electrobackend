@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { Order, Product, Customer } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
+import { exportOrdersToCSV } from "../utils/export.js";
+import { activityMiddleware } from "../utils/activityLog.js";
 
 const router = Router();
 
@@ -75,7 +77,7 @@ router.get("/:id", protect, async (req, res) => {
 
 // ─── POST /api/orders ─────────────────────────────────────────────────
 // Create new order
-router.post("/", protect, async (req, res) => {
+router.post("/", protect, activityMiddleware('create', 'order'), async (req, res) => {
   try {
     const {
       items = [],
@@ -292,6 +294,26 @@ router.patch("/:id/cancel", protect, async (req, res) => {
   } catch (err) {
     console.error("Cancel order error:", err);
     return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── GET /api/orders/export ──────────────────────────────────────────────
+// Export orders to CSV (must come before /:id route)
+router.get("/export", protect, async (req, res) => {
+  try {
+    const filter = { customerEmail: req.user.email };
+    
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
+
+    const csv = await exportOrdersToCSV(filter);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=orders.csv');
+    res.send(csv);
+  } catch (err) {
+    console.error("Export orders error:", err);
+    return res.status(500).json({ message: "Server error during export" });
   }
 });
 

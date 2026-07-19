@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { User, Product, Customer, Order, Inventory } from "../../utils/models.js";
+import { User, Product, Customer, Order, Inventory, ActivityLog } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
+import { getCache, setCache, clearCachePattern } from "../../utils/cache.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
@@ -10,6 +11,13 @@ const guard = [protect, isAdmin];
 // Main dashboard statistics — all queries run in parallel for speed
 router.get("/", ...guard, async (req, res) => {
   try {
+    // Check cache first
+    const cacheKey = "admin:stats:dashboard";
+    const cached = getCache(cacheKey);
+    if (cached) {
+      return res.json({ data: cached, cached: true });
+    }
+
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -147,44 +155,92 @@ router.get("/", ...guard, async (req, res) => {
     const revNow = revenueThisMonth[0]?.total || 0;
     const revPrev = revenueLastMonth[0]?.total || 0;
 
+    const responseData = {
+      // KPI Cards
+      overview: {
+        totalRevenue: revenueAll[0]?.total || 0,
+        revenueThisMonth: revNow,
+        revenueGrowth: calcGrowth(revNow, revPrev),
+
+        totalOrders,
+        ordersThisMonth,
+        ordersGrowth: calcGrowth(ordersThisMonth, ordersLastMonth),
+
+        totalUsers,
+        newUsersThisMonth,
+        usersGrowth: calcGrowth(newUsersThisMonth, newUsersLastMonth),
+
+        totalCustomers,
+        newCustomersThisMonth,
+        customersGrowth: calcGrowth(newCustomersThisMonth, newCustomersLastMonth),
+
+        totalProducts,
+        activeProducts,
+
+        lowStockCount,
+        outOfStockCount,
+      },
+      // Charts
+      monthlyRevenue,
+      userGrowth,
+      orderStatusBreakdown,
+      paymentMethodBreakdown,
+      // Tables
+      topProducts,
+      recentOrders,
+    };
+
+    // Cache the result
+    setCache(cacheKey, responseData);
+
+    return res.json({ data: responseData, cached: false });
+  } catch (err) {
+    console.error("Stats error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── GET /api/admin/stats/activity-logs ───────────────────────────────────────
+// Get activity logs for admin dashboard
+router.get("/activity-logs", ...guard, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      action,
+      entity,
+      userId,
+    } = req.query;
+
+    const filter = {};
+
+    if (action) filter.action = action;
+    if (entity) filter.entity = entity;
+    if (userId) filter.user = userId;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [logs, total] = await Promise.all([
+      ActivityLog.find(filter)
+        .populate('user', 'username email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      ActivityLog.countDocuments(filter),
+    ]);
+
     return res.json({
-      data: {
-        // KPI Cards
-        overview: {
-          totalRevenue: revenueAll[0]?.total || 0,
-          revenueThisMonth: revNow,
-          revenueGrowth: calcGrowth(revNow, revPrev),
-
-          totalOrders,
-          ordersThisMonth,
-          ordersGrowth: calcGrowth(ordersThisMonth, ordersLastMonth),
-
-          totalUsers,
-          newUsersThisMonth,
-          usersGrowth: calcGrowth(newUsersThisMonth, newUsersLastMonth),
-
-          totalCustomers,
-          newCustomersThisMonth,
-          customersGrowth: calcGrowth(newCustomersThisMonth, newCustomersLastMonth),
-
-          totalProducts,
-          activeProducts,
-
-          lowStockCount,
-          outOfStockCount,
-        },
-        // Charts
-        monthlyRevenue,
-        userGrowth,
-        orderStatusBreakdown,
-        paymentMethodBreakdown,
-        // Tables
-        topProducts,
-        recentOrders,
+      data: logs,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (err) {
-    console.error("Stats error:", err);
+    console.error("Get activity logs error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });

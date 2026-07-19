@@ -77,7 +77,7 @@ router.get("/:id", ...guard, async (req, res) => {
 // Create a new user (admin can set role)
 router.post("/", ...guard, async (req, res) => {
   try {
-    const { username, email, password, role = "user", status = "active", phone, address, avatar } = req.body;
+    const { username, email, password, role = "user", status = "active", phone, address, avatar } = req.body || {};
     if (!username || !email || !password)
       return res.status(400).json({ message: "username, email and password are required" });
 
@@ -156,7 +156,7 @@ router.delete("/:id", ...guard, async (req, res) => {
 // Quick activate / suspend toggle
 router.put("/:id/status", ...guard, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status } = req.body || {};
     if (!["active", "suspended"].includes(status))
       return res.status(400).json({ message: "status must be 'active' or 'suspended'" });
 

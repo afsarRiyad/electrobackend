@@ -70,7 +70,7 @@ router.get("/:id", ...guard, async (req, res) => {
 // ─── POST /api/admin/customers ────────────────────────────────────────────────
 router.post("/", ...guard, async (req, res) => {
   try {
-    const { name, email, phone, avatar, address, status, notes } = req.body;
+    const { name, email, phone, avatar, address, status, notes } = req.body || {};
     if (!name || !email)
       return res.status(400).json({ message: "name and email are required" });
 
@@ -162,7 +162,7 @@ router.get("/:id/orders", ...guard, async (req, res) => {
 // ─── PUT /api/admin/customers/:id/status ─────────────────────────────────────
 router.put("/:id/status", ...guard, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status } = req.body || {};
     if (!["active", "inactive", "blocked"].includes(status))
       return res.status(400).json({ message: "Invalid status value" });
 

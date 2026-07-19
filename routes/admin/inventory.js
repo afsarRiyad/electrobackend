@@ -117,7 +117,7 @@ router.get("/:id", ...guard, async (req, res) => {
 // Create initial inventory record for a product
 router.post("/", ...guard, async (req, res) => {
   try {
-    const { product, quantity = 0, lowStockThreshold = 10, location, note } = req.body;
+    const { product, quantity = 0, lowStockThreshold = 10, location, note } = req.body || {};
     if (!product) return res.status(400).json({ message: "product ID is required" });
 
     const exists = await Inventory.findOne({ product });
@@ -160,7 +160,7 @@ router.post("/", ...guard, async (req, res) => {
 // Full update — restock, adjust, damage etc.
 router.put("/:id", ...guard, async (req, res) => {
   try {
-    const { action, quantityChange, quantity, lowStockThreshold, location, note } = req.body;
+    const { action, quantityChange, quantity, lowStockThreshold, location, note } = req.body || {};
 
     const inventory = await Inventory.findById(req.params.id);
     if (!inventory) return res.status(404).json({ message: "Inventory record not found" });
