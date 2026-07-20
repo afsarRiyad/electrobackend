@@ -9,7 +9,7 @@ const rateLimitMessage = (message) => ({
 // General API limiter
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitMessage(
@@ -20,7 +20,7 @@ export const generalLimiter = rateLimit({
 // Authentication limiter
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: 100,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
@@ -32,7 +32,7 @@ export const authLimiter = rateLimit({
 // Admin API limiter
 export const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitMessage(
@@ -43,7 +43,7 @@ export const adminLimiter = rateLimit({
 // File upload limiter
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitMessage(
