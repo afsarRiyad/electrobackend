@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { User, Order, Product } from "../utils/models.js";
+import { User, Order, Product, Message } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
+import { validateMessage } from "../utils/validation.js";
 
 const router = Router();
 
@@ -539,6 +540,69 @@ router.patch("/payment-methods/:id/default", protect, async (req, res) => {
     return res.json({ message: "Default payment method updated" });
   } catch (err) {
     console.error("Set default payment method error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── POST /api/user/contact ─────────────────────────────────────────────────────
+// Send message to admin inbox (authenticated users)
+router.post("/contact", protect, validateMessage, async (req, res) => {
+  try {
+    const { subject, body, priority, category, relatedOrder } = req.body;
+
+    const message = await Message.create({
+      sender: req.user._id,
+      recipient: null, // Send to all admins
+      subject,
+      body,
+      priority: priority || "normal",
+      category: category || "general",
+      relatedOrder: relatedOrder || null,
+    });
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "username email avatar")
+      .populate("relatedOrder", "orderNumber status");
+
+    return res.status(201).json({ 
+      message: "Message sent to admin", 
+      data: populatedMessage 
+    });
+  } catch (err) {
+    console.error("Send contact message error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── GET /api/user/messages ─────────────────────────────────────────────────────
+// Get user's sent messages to admin
+router.get("/messages", protect, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [messages, total] = await Promise.all([
+      Message.find({ sender: req.user._id })
+        .populate("recipient", "username email avatar")
+        .populate("relatedOrder", "orderNumber status")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Message.countDocuments({ sender: req.user._id }),
+    ]);
+
+    return res.json({
+      data: messages,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (err) {
+    console.error("Get user messages error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
