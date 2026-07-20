@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import compression from "compression";
+import helmet from "helmet";
+import morgan from "morgan";
 
 // ─── Existing routes ──────────────────────────────────────────────────────────
 import productRoutes from "./routes/products.js";
@@ -28,23 +30,75 @@ import { connectDB } from "./utils/db.js";
 import { generalLimiter, authLimiter, adminLimiter, uploadLimiter } from "./utils/rateLimiter.js";
 import { apiCache, productCache, noCache } from "./utils/cacheHeaders.js";
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+
 dotenv.config();
 console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 
 const app = express();
 console.log("🚀 index.js started");
 
+// Trust proxy for rate limiting behind reverse proxy
+app.set("trust proxy", 1);
+
+// Hide Express signature
+app.disable("x-powered-by");
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: isDevelopment ? false : undefined,
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Request logging (development only)
+if (isDevelopment) {
+  app.use(morgan("dev"));
+}
+
+// CORS configuration
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.ADMIN_URL,
+  "http://localhost:5173", // Frontend (Vite)
+  "http://localhost:5174", // Admin (Vite, if separate)
+  "http://localhost:3000", // Alternative frontend
+  "http://localhost:3001", // Alternative admin
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "*",
+    origin(origin, callback) {
+      // Allow requests with no Origin (Postman, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 const port = process.env.PORT || 5000;
-app.use(express.json());
-app.use(compression());
+
+// Increase JSON payload limit
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Compression configuration
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  },
+  threshold: 1024,
+  level: 6,
+}));
 
 // Connect to MongoDB
 connectDB();
@@ -245,6 +299,72 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// ─── Global Error Handler ───────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error("Error:", err);
+  
+  // Mongoose validation error
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+      message: "Validation Error",
+      errors: Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message,
+      })),
+    });
+  }
+  
+  // Mongoose duplicate key error
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyPattern)[0];
+    return res.status(409).json({
+      message: `${field} already exists`,
+    });
+  }
+  
+  // JWT errors
+  if (err.name === "JsonWebTokenError") {
+    return res.status(401).json({ message: "Invalid token" });
+  }
+  
+  if (err.name === "TokenExpiredError") {
+    return res.status(401).json({ message: "Token expired" });
+  }
+  
+  // Rate limit error
+  if (err.status === 429) {
+    return res.status(429).json({ message: err.message });
+  }
+  
+  // Default error
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    message: err.message || "Internal server error",
+    ...(isDevelopment && { stack: err.stack }),
+  });
 });
+
+// ─── Graceful Shutdown ───────────────────────────────────────────────────────────
+const server = app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+});
+
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  server.close(() => {
+    console.log("HTTP server closed.");
+    process.exit(0);
+  });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error("Forced shutdown after timeout.");
+    process.exit(1);
+  }, 10000);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
