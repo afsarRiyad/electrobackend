@@ -200,6 +200,132 @@ router.get("/", ...guard, async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/stats/charts ───────────────────────────────────────────────
+// Get chart history data with flexible time ranges
+router.get("/charts", ...guard, async (req, res) => {
+  try {
+    const { 
+      type = "revenue", // revenue, orders, users, products
+      range = "12months", // 7days, 30days, 90days, 12months, 24months
+    } = req.query;
+
+    const now = new Date();
+    let startDate;
+    
+    switch (range) {
+      case "7days":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "30days":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "90days":
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case "24months":
+        startDate = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+        break;
+      default: // 12months
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    }
+
+    let data;
+    const cacheKey = `admin:stats:charts:${type}:${range}`;
+    const cached = getCache(cacheKey);
+    if (cached) {
+      return res.json({ data: cached, cached: true });
+    }
+
+    switch (type) {
+      case "revenue":
+        data = await Order.aggregate([
+          { $match: { paymentStatus: "paid", createdAt: { $gte: startDate } } },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+                day: range === "7days" ? { $dayOfMonth: "$createdAt" } : undefined,
+              },
+              revenue: { $sum: "$totalAmount" },
+              orders: { $sum: 1 },
+            },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        ]);
+        break;
+
+      case "orders":
+        data = await Order.aggregate([
+          { $match: { createdAt: { $gte: startDate } } },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+                day: range === "7days" ? { $dayOfMonth: "$createdAt" } : undefined,
+              },
+              total: { $sum: 1 },
+              pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+              processing: { $sum: { $cond: [{ $eq: ["$status", "processing"] }, 1, 0] } },
+              shipped: { $sum: { $cond: [{ $eq: ["$status", "shipped"] }, 1, 0] } },
+              delivered: { $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] } },
+              cancelled: { $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] } },
+            },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        ]);
+        break;
+
+      case "users":
+        data = await User.aggregate([
+          { $match: { createdAt: { $gte: startDate } } },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+                day: range === "7days" ? { $dayOfMonth: "$createdAt" } : undefined,
+              },
+              total: { $sum: 1 },
+              admins: { $sum: { $cond: [{ $eq: ["$role", "admin"] }, 1, 0] } },
+            },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        ]);
+        break;
+
+      case "products":
+        data = await Order.aggregate([
+          { $match: { createdAt: { $gte: startDate } } },
+          { $unwind: "$items" },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+                day: range === "7days" ? { $dayOfMonth: "$createdAt" } : undefined,
+              },
+              totalSold: { $sum: "$items.quantity" },
+              revenue: { $sum: "$items.totalPrice" },
+            },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        ]);
+        break;
+
+      default:
+        return res.status(400).json({ message: "Invalid chart type" });
+    }
+
+    setCache(cacheKey, data);
+    return res.json({ data, cached: false });
+  } catch (err) {
+    console.error("Chart history error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ─── GET /api/admin/stats/activity-logs ───────────────────────────────────────
 // Get activity logs for admin dashboard
 router.get("/activity-logs", ...guard, async (req, res) => {
