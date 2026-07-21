@@ -60,11 +60,11 @@ if (isDevelopment) {
 const allowedOrigins = [
   process.env.CLIENT_URL,
   process.env.ADMIN_URL,
-  "http://localhost:5173", // Frontend (Vite)
-  "http://localhost:5174", // Admin (Vite, if separate)
-  "http://localhost:3000", // Alternative frontend
-  "http://localhost:3001", // Alternative admin
-  "dashboard-omega-lilac-63.vercel.app", // Vercel admin dashboard
+  "http://localhost:5173", 
+  "http://localhost:5174", 
+  "http://localhost:3000", 
+  "http://localhost:3001", 
+  "https://dashboard-omega-lilac-63.vercel.app", 
 ].filter(Boolean);
 
 app.use(
