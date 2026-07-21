@@ -64,7 +64,7 @@ const allowedOrigins = [
   "http://localhost:5174", // Admin (Vite, if separate)
   "http://localhost:3000", // Alternative frontend
   "http://localhost:3001", // Alternative admin
-  "https://dashboard-j6az-hmcjlixx5-nurulafsarriyad06-2470s-projects.vercel.app", // Vercel admin dashboard
+  "dashboard-omega-lilac-63.vercel.app", // Vercel admin dashboard
 ].filter(Boolean);
 
 app.use(

@@ -107,4 +107,77 @@ router.post("/delete-by-url", protect, isAdmin, async (req, res) => {
   }
 });
 
+// ─── POST /api/upload/user/single ───────────────────────────────────────────────
+// Upload single image for authenticated users (profile, etc.)
+router.post("/user/single", protect, uploadSingle, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    return res.status(201).json({
+      message: "Image uploaded successfully",
+      data: {
+        url: req.file.path,
+        publicId: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+  } catch (err) {
+    console.error("User single upload error:", err);
+    return res.status(500).json({ message: "Server error during upload" });
+  }
+});
+
+// ─── POST /api/upload/user/multiple ──────────────────────────────────────────────
+// Upload multiple images for authenticated users
+router.post("/user/multiple", protect, uploadMultiple, async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const uploadedFiles = req.files.map((file) => ({
+      url: file.path,
+      publicId: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+    }));
+
+    return res.status(201).json({
+      message: `${req.files.length} images uploaded successfully`,
+      data: uploadedFiles,
+    });
+  } catch (err) {
+    console.error("User multiple upload error:", err);
+    return res.status(500).json({ message: "Server error during upload" });
+  }
+});
+
+// ─── DELETE /api/upload/user/:publicId ────────────────────────────────────────────
+// Delete user's own image
+router.delete("/user/:publicId", protect, async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    
+    if (!publicId) {
+      return res.status(400).json({ message: "Public ID is required" });
+    }
+
+    const result = await deleteImage(publicId);
+
+    if (result.success) {
+      return res.json({ message: "Image deleted successfully" });
+    } else {
+      return res.status(500).json({ message: result.error || "Failed to delete image" });
+    }
+  } catch (err) {
+    console.error("User delete image error:", err);
+    return res.status(500).json({ message: "Server error during deletion" });
+  }
+});
+
 export default router;
