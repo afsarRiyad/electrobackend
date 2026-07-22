@@ -146,25 +146,35 @@ router.post("/login", validateLogin, async (req, res) => {
       ],
     });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return res.json({
-        success: true,
-        error: false,
-        message: "Login successful",
-        data: {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
-          token: generateToken(user._id),
-        },
-      });
-    } else {
+    // Check if user exists
+    if (!user) {
       return res.status(401).json({
         success: false,
         error: true,
-        message: "Invalid credentials"
+        message: "User not found"
       });
     }
+
+    // Check password
+    if (!(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        error: true,
+        message: "Incorrect password"
+      });
+    }
+
+    return res.json({
+      success: true,
+      error: false,
+      message: "Login successful",
+      data: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        token: generateToken(user._id),
+      },
+    });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Server error during login" });

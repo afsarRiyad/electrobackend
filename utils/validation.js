@@ -25,7 +25,13 @@ export const validateSignup = [
     .isLength({ min: 3, max: 30 })
     .withMessage("Username must be 3-30 characters")
     .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage("Username can only contain letters, numbers, and underscores"),
+    .withMessage("Username can only contain letters, numbers, and underscores")
+    .custom((value) => {
+      if (/^\d+$/.test(value)) {
+        throw new Error("Username cannot contain only numbers");
+      }
+      return true;
+    }),
   body("email")
     .trim()
     .isEmail()
