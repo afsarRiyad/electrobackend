@@ -18,22 +18,28 @@ export const handleValidationErrors = (req, res, next) => {
 // Auth validation
 export const validateSignup = [
   body("username")
-    .optional()
     .trim()
+    .notEmpty()
+    .withMessage("Username is required")
     .isLength({ min: 3, max: 30 })
-    .withMessage("Username must be 3-30 characters"),
+    .withMessage("Username must be 3-30 characters")
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage("Username can only contain letters, numbers, and underscores"),
   body("email")
     .trim()
     .isEmail()
     .normalizeEmail()
-    .withMessage("Valid email required"),
+    .withMessage("Valid email required")
+    .isLength({ max: 100 })
+    .withMessage("Email too long"),
   body("password")
-    .optional()
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters"),
+    .notEmpty()
+    .withMessage("Password is required")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage("Password must contain at least one uppercase letter, one lowercase letter, and one number"),
   body("confirmPassword")
-    .if(body("password").exists())
-    .trim()
     .notEmpty()
     .withMessage("Please confirm your password")
     .custom((value, { req }) => {
