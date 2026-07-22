@@ -13,6 +13,8 @@ import compareRoutes from "./routes/compare.js";
 import orderRoutes from "./routes/orders.js";
 import userRoutes from "./routes/user.js";
 import uploadRoutes from "./routes/upload.js";
+import returnRoutes from "./routes/returns.js";
+import refundRoutes from "./routes/refunds.js";
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 import adminAuthRoutes from "./routes/admin/adminAuth.js";
@@ -25,6 +27,7 @@ import adminPaymentRoutes from "./routes/admin/payments.js";
 import adminInventoryRoutes from "./routes/admin/inventory.js";
 import adminStatsRoutes from "./routes/admin/stats.js";
 import adminInboxRoutes from "./routes/admin/inbox.js";
+import adminReturnRoutes from "./routes/admin/returns.js";
 
 import { connectDB } from "./utils/db.js";
 import { generalLimiter, authLimiter, adminLimiter, uploadLimiter } from "./utils/rateLimiter.js";
@@ -269,6 +272,14 @@ app.get("/", (req, res) => {
           sent: "GET /api/admin/inbox/sent/list (Admin)",
           markAllRead: "PATCH /api/admin/inbox/mark-all-read/bulk (Admin)",
         },
+        returns: {
+          list: "GET /api/admin/returns (Admin)",
+          get: "GET /api/admin/returns/:id (Admin)",
+          updateStatus: "PATCH /api/admin/returns/:id/status (Admin)",
+          refunds: "GET /api/admin/returns/refunds/all (Admin)",
+          updateRefundStatus: "PATCH /api/admin/returns/refunds/:id/status (Admin)",
+          stats: "GET /api/admin/returns/stats/overview (Admin)",
+        },
       },
     },
   });
@@ -286,6 +297,8 @@ app.use("/api", generalLimiter, noCache, compareRoutes);
 app.use("/api/orders", generalLimiter, noCache, orderRoutes);
 app.use("/api/user", generalLimiter, noCache, userRoutes);
 app.use("/api/upload", uploadLimiter, noCache, uploadRoutes);
+app.use("/api/returns", generalLimiter, noCache, returnRoutes);
+app.use("/api/refunds", generalLimiter, noCache, refundRoutes);
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", authLimiter, noCache, adminAuthRoutes);
@@ -298,6 +311,7 @@ app.use("/api/admin/payments", adminLimiter, noCache, adminPaymentRoutes);
 app.use("/api/admin/inventory", adminLimiter, noCache, adminInventoryRoutes);
 app.use("/api/admin/stats", adminLimiter, apiCache, adminStatsRoutes);
 app.use("/api/admin/inbox", adminLimiter, noCache, adminInboxRoutes);
+app.use("/api/admin/returns", adminLimiter, noCache, adminReturnRoutes);
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

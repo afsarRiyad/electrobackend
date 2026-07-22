@@ -185,7 +185,7 @@ const orderSchema = new mongoose.Schema(
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"],
+      enum: ["pending", "processing", "shipped", "delivered", "cancelled", "refunded", "return_requested", "return_approved", "return_completed"],
       default: "pending",
     },
     paymentMethod: {
@@ -467,6 +467,98 @@ const messageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// ─── RETURN REQUEST ─────────────────────────────────────────────────────────────
+const returnRequestItemSchema = new mongoose.Schema(
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    productName: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    reason: { type: String, required: true, enum: ["damaged", "defective", "wrong_item", "not_as_described", "changed_mind", "other"] },
+    condition: { type: String, required: true, enum: ["new", "opened", "used"] },
+    images: [{ type: String }], // Cloudinary URLs
+  },
+  { _id: false }
+);
+
+const returnRequestSchema = new mongoose.Schema(
+  {
+    order: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true },
+    orderNumber: { type: String, required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    customerName: { type: String, required: true },
+    customerEmail: { type: String, required: true },
+    items: { type: [returnRequestItemSchema], required: true },
+    reason: { type: String, required: true },
+    description: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "received", "processing", "completed"],
+      default: "pending",
+    },
+    refundMethod: {
+      type: String,
+      enum: ["original_payment", "store_credit", "bank_transfer"],
+      default: "original_payment",
+    },
+    refundAmount: { type: Number, default: 0 },
+    shippingAddress: {
+      street: { type: String },
+      city: { type: String },
+      state: { type: String },
+      zip: { type: String },
+      country: { type: String },
+    },
+    trackingNumber: { type: String, default: null },
+    adminNotes: { type: String, default: null },
+    statusHistory: [{
+      status: { type: String, required: true },
+      changedAt: { type: Date, default: Date.now },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      note: { type: String, default: null },
+    }],
+  },
+  { timestamps: true }
+);
+
+// ─── REFUND REQUEST ─────────────────────────────────────────────────────────────
+const refundRequestSchema = new mongoose.Schema(
+  {
+    order: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true },
+    orderNumber: { type: String, required: true },
+    returnRequest: { type: mongoose.Schema.Types.ObjectId, ref: "ReturnRequest", default: null },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    customerName: { type: String, required: true },
+    customerEmail: { type: String, required: true },
+    amount: { type: Number, required: true },
+    reason: { type: String, required: true, enum: ["return", "damaged", "wrong_item", "late_delivery", "cancellation", "other"] },
+    description: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "processing", "completed", "failed"],
+      default: "pending",
+    },
+    refundMethod: {
+      type: String,
+      enum: ["original_payment", "store_credit", "bank_transfer"],
+      required: true,
+    },
+    bankDetails: {
+      accountName: { type: String },
+      accountNumber: { type: String },
+      bankName: { type: String },
+      routingNumber: { type: String },
+    },
+    adminNotes: { type: String, default: null },
+    statusHistory: [{
+      status: { type: String, required: true },
+      changedAt: { type: Date, default: Date.now },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      note: { type: String, default: null },
+    }],
+  },
+  { timestamps: true }
+);
+
 messageSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
 messageSchema.index({ sender: 1, createdAt: -1 });
 messageSchema.index({ isRead: 1 });
@@ -474,4 +566,19 @@ messageSchema.index({ priority: 1 });
 messageSchema.index({ category: 1 });
 messageSchema.index({ replyTo: 1 });
 
+returnRequestSchema.index({ order: 1 });
+returnRequestSchema.index({ user: 1 });
+returnRequestSchema.index({ status: 1 });
+returnRequestSchema.index({ orderNumber: 1 });
+returnRequestSchema.index({ createdAt: -1 });
+
+refundRequestSchema.index({ order: 1 });
+refundRequestSchema.index({ user: 1 });
+refundRequestSchema.index({ returnRequest: 1 });
+refundRequestSchema.index({ status: 1 });
+refundRequestSchema.index({ orderNumber: 1 });
+refundRequestSchema.index({ createdAt: -1 });
+
 export const Message = mongoose.model("Message", messageSchema);
+export const ReturnRequest = mongoose.model("ReturnRequest", returnRequestSchema);
+export const RefundRequest = mongoose.model("RefundRequest", refundRequestSchema);

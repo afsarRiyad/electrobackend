@@ -21,6 +21,7 @@ export const validateSignup = [
     .trim()
     .notEmpty()
     .withMessage("Username is required")
+    .if(body("username").exists({ checkNull: true, checkFalsy: true }))
     .isLength({ min: 3, max: 30 })
     .withMessage("Username must be 3-30 characters")
     .matches(/^[a-zA-Z0-9_]+$/)
@@ -174,5 +175,83 @@ export const validateMessage = [
     .optional()
     .isIn(["general", "support", "order", "payment", "other"])
     .withMessage("Invalid category"),
+  handleValidationErrors,
+];
+
+// Return request validation
+export const validateReturnRequest = [
+  body("order")
+    .notEmpty()
+    .withMessage("Order ID required")
+    .isMongoId()
+    .withMessage("Invalid order ID"),
+  body("orderNumber")
+    .trim()
+    .notEmpty()
+    .withMessage("Order number required"),
+  body("items")
+    .isArray({ min: 1 })
+    .withMessage("At least one item required"),
+  body("items.*.product")
+    .notEmpty()
+    .withMessage("Product ID required"),
+  body("items.*.quantity")
+    .isInt({ min: 1 })
+    .withMessage("Quantity must be at least 1"),
+  body("items.*.reason")
+    .isIn(["damaged", "defective", "wrong_item", "not_as_described", "changed_mind", "other"])
+    .withMessage("Invalid reason"),
+  body("items.*.condition")
+    .isIn(["new", "opened", "used"])
+    .withMessage("Invalid condition"),
+  body("reason")
+    .trim()
+    .notEmpty()
+    .withMessage("Return reason required"),
+  body("description")
+    .trim()
+    .notEmpty()
+    .isLength({ min: 10, max: 500 })
+    .withMessage("Description must be 10-500 characters"),
+  body("refundMethod")
+    .optional()
+    .isIn(["original_payment", "store_credit", "bank_transfer"])
+    .withMessage("Invalid refund method"),
+  handleValidationErrors,
+];
+
+// Refund request validation
+export const validateRefundRequest = [
+  body("order")
+    .notEmpty()
+    .withMessage("Order ID required")
+    .isMongoId()
+    .withMessage("Invalid order ID"),
+  body("orderNumber")
+    .trim()
+    .notEmpty()
+    .withMessage("Order number required"),
+  body("amount")
+    .isFloat({ min: 0.01 })
+    .withMessage("Amount must be greater than 0"),
+  body("reason")
+    .isIn(["return", "damaged", "wrong_item", "late_delivery", "cancellation", "other"])
+    .withMessage("Invalid reason"),
+  body("description")
+    .trim()
+    .notEmpty()
+    .isLength({ min: 10, max: 500 })
+    .withMessage("Description must be 10-500 characters"),
+  body("refundMethod")
+    .isIn(["original_payment", "store_credit", "bank_transfer"])
+    .withMessage("Invalid refund method"),
+  body("bankDetails")
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.refundMethod === "bank_transfer" && !value) {
+        throw new Error("Bank details required for bank transfer");
+      }
+      return true;
+    }),
   handleValidationErrors,
 ];
