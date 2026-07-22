@@ -35,7 +35,7 @@ export const validateSignup = [
   body("password")
     .custom((value) => {
       if (!value) {
-        throw new Error("Password is required");
+        throw new Error("Password fields are required");
       }
       if (value.length < 8) {
         throw new Error("Password must be at least 8 characters");
@@ -46,9 +46,12 @@ export const validateSignup = [
       return true;
     }),
   body("confirmPassword")
-    .optional()
     .custom((value, { req }) => {
-      // Only validate if both password and confirmPassword are provided
+      // If password is provided but confirmPassword is empty
+      if (req.body.password && !value) {
+        throw new Error("Please confirm your password");
+      }
+      // If both are provided, they must match
       if (req.body.password && value && value !== req.body.password) {
         throw new Error("Passwords do not match");
       }
