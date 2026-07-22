@@ -29,6 +29,7 @@ import adminInboxRoutes from "./routes/admin/inbox.js";
 import { connectDB } from "./utils/db.js";
 import { generalLimiter, authLimiter, adminLimiter, uploadLimiter } from "./utils/rateLimiter.js";
 import { apiCache, productCache, noCache } from "./utils/cacheHeaders.js";
+import { passport } from "./utils/oauth.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -44,6 +45,9 @@ app.set("trust proxy", 1);
 
 // Hide Express signature
 app.disable("x-powered-by");
+
+// Initialize Passport
+app.use(passport.initialize());
 
 // Security headers with Helmet
 app.use(helmet({

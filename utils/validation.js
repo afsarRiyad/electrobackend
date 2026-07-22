@@ -18,6 +18,7 @@ export const handleValidationErrors = (req, res, next) => {
 // Auth validation
 export const validateSignup = [
   body("username")
+    .optional()
     .trim()
     .isLength({ min: 3, max: 30 })
     .withMessage("Username must be 3-30 characters"),
@@ -27,8 +28,20 @@ export const validateSignup = [
     .normalizeEmail()
     .withMessage("Valid email required"),
   body("password")
+    .optional()
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters"),
+  body("confirmPassword")
+    .if(body("password").exists())
+    .trim()
+    .notEmpty()
+    .withMessage("Please confirm your password")
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error("Passwords do not match");
+      }
+      return true;
+    }),
   handleValidationErrors,
 ];
 

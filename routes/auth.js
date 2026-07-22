@@ -6,6 +6,7 @@ import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
+import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
 
 const router = Router();
 
@@ -303,5 +304,29 @@ router.put("/change-password", protect, async (req, res) => {
     return res.status(500).json({ message: "Server error during password change" });
   }
 });
+
+// ─── Google OAuth Routes ───────────────────────────────────────────────────────
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login", session: false }),
+  (req, res) => {
+    const token = oauthGenerateToken(req.user._id);
+    res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/auth/callback?token=${token}`);
+  }
+);
+
+// ─── Apple OAuth Routes ─────────────────────────────────────────────────────────
+router.get("/apple", passport.authenticate("apple", { scope: ["email", "name"] }));
+
+router.post(
+  "/apple/callback",
+  passport.authenticate("apple", { failureRedirect: "/login", session: false }),
+  (req, res) => {
+    const token = oauthGenerateToken(req.user._id);
+    res.json({ token, user: req.user });
+  }
+);
 
 export default router;

@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 // ─── USER ────────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true, unique: true, trim: true },
+    username: { type: String, required: false, unique: true, sparse: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    password: { type: String, required: true },
+    password: { type: String, required: false },
     role: { type: String, enum: ["user", "admin"], default: "user" },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     avatar: { type: String, default: null },
@@ -13,6 +13,17 @@ const userSchema = new mongoose.Schema(
     lastName: { type: String, default: null },
     companyName: { type: String, default: null },
     phone: { type: String, default: null },
+    // OAuth providers
+    oauthProviders: {
+      google: {
+        id: { type: String, default: null },
+        email: { type: String, default: null },
+      },
+      apple: {
+        id: { type: String, default: null },
+        email: { type: String, default: null },
+      },
+    },
     billingAddress: {
       firstName: { type: String, default: null },
       lastName: { type: String, default: null },
