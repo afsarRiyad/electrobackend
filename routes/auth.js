@@ -104,6 +104,9 @@ router.post("/signup", validateSignup, async (req, res) => {
 
     if (user) {
       return res.status(201).json({
+        success: true,
+        error: false,
+        message: "Signup successful",
         data: {
           _id: user._id,
           username: user.username,
@@ -112,7 +115,11 @@ router.post("/signup", validateSignup, async (req, res) => {
         },
       });
     } else {
-      return res.status(400).json({ message: "Invalid user data" });
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "Invalid user data"
+      });
     }
   } catch (error) {
     console.error("Signup error:", error);
@@ -141,6 +148,9 @@ router.post("/login", validateLogin, async (req, res) => {
 
     if (user && (await bcrypt.compare(password, user.password))) {
       return res.json({
+        success: true,
+        error: false,
+        message: "Login successful",
         data: {
           _id: user._id,
           username: user.username,
@@ -149,7 +159,11 @@ router.post("/login", validateLogin, async (req, res) => {
         },
       });
     } else {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({
+        success: false,
+        error: true,
+        message: "Invalid credentials"
+      });
     }
   } catch (error) {
     console.error("Login error:", error);
