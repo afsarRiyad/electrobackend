@@ -33,18 +33,33 @@ export const validateSignup = [
     .isLength({ max: 100 })
     .withMessage("Email too long"),
   body("password")
-    .notEmpty()
-    .withMessage("Password is required")
-    .isLength({ min: 8 })
-    .withMessage("Password must be at least 8 characters")
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage("Password must contain at least one uppercase letter, one lowercase letter, and one number"),
+    .custom((value) => {
+      if (!value) {
+        throw new Error("Password is required");
+      }
+      if (value.length < 8) {
+        throw new Error("Password must be at least 8 characters");
+      }
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value)) {
+        throw new Error("Password must contain at least one uppercase letter, one lowercase letter, and one number");
+      }
+      return true;
+    }),
   body("confirmPassword")
-    .notEmpty()
-    .withMessage("Please confirm your password")
+    .optional()
     .custom((value, { req }) => {
-      if (value !== req.body.password) {
+      // Only validate if both password and confirmPassword are provided
+      if (req.body.password && value && value !== req.body.password) {
         throw new Error("Passwords do not match");
+      }
+      return true;
+    }),
+  body("agreeToTerms")
+    .notEmpty()
+    .withMessage("You must agree to the terms and conditions")
+    .custom((value) => {
+      if (value !== true && value !== "true") {
+        throw new Error("You must agree to the terms and conditions");
       }
       return true;
     }),
