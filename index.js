@@ -71,7 +71,8 @@ const allowedOrigins = [
   "http://localhost:5174", 
   "http://localhost:3000", 
   "http://localhost:3001", 
-  "https://dashboard-omega-lilac-63.vercel.app", 
+  "https://dashboard-omega-lilac-63.vercel.app",
+  "https://tech-mart-six.vercel.app",
 ].filter(Boolean);
 
 app.use(
