@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Order, Customer } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
-import { isAdmin } from "../../utils/adminMiddleware.js";
+import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 import { exportOrdersToCSV } from "../../utils/export.js";
 import { activityMiddleware } from "../../utils/activityLog.js";
 import { clearCachePattern } from "../../utils/cache.js";

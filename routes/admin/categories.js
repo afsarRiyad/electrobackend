@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Category, Product } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
-import { isAdmin } from "../../utils/adminMiddleware.js";
+import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 import { activityMiddleware } from "../../utils/activityLog.js";
 import { clearCachePattern } from "../../utils/cache.js";
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { protect } from "../../utils/authMiddleware.js";
-import { isAdmin } from "../../utils/adminMiddleware.js";
+import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 import { Message, User } from "../../utils/models.js";
 import { validateMessage } from "../../utils/validation.js";
 

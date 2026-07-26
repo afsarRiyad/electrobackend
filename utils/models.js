@@ -6,13 +6,26 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: false, unique: true, sparse: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: false },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: { 
+      type: String, 
+      enum: ["user", "support_admin", "product_manager", "order_manager", "content_manager", "admin", "super_admin"], 
+      default: "user" 
+    },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     avatar: { type: String, default: null },
     firstName: { type: String, default: null },
     lastName: { type: String, default: null },
     companyName: { type: String, default: null },
     phone: { type: String, default: null },
+    permissions: [{
+      resource: { type: String }, // products, orders, users, categories, etc.
+      actions: [{ type: String }], // create, read, update, delete
+    }],
+    // Email verification
+    isVerified: { type: Boolean, default: false },
+    verificationToken: { type: String, default: null },
+    verificationTokenExpires: { type: Date, default: null },
+    emailVerifiedAt: { type: Date, default: null },
     // OAuth providers
     oauthProviders: {
       google: {

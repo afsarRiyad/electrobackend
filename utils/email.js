@@ -13,6 +13,55 @@ const createTransporter = () => {
   });
 };
 
+// Send email verification email
+export const sendVerificationEmail = async (email, verificationToken, username) => {
+  try {
+    const transporter = createTransporter();
+    
+    // Create verification URL (adjust frontend URL as needed)
+    const verificationUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+    
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME || 'TechMart'}" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Verify Your Email Address",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Email</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2563eb;">Verify Your Email Address</h2>
+            <p>Hi ${username},</p>
+            <p>Thank you for signing up for TechMart! Please verify your email address by clicking the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a>
+            </div>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create an account, please ignore this email.</p>
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+              © ${new Date().getFullYear()} TechMart. All rights reserved.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error("Email verification error:", error);
+    return false;
+  }
+};
+
 // Send password reset email
 export const sendPasswordResetEmail = async (email, resetToken, username) => {
   try {

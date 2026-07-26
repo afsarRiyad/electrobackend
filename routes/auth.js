@@ -4,9 +4,10 @@ import crypto from "crypto";
 import { Router } from "express";
 import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
-import { sendPasswordResetEmail } from "../utils/email.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
 import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
+import { isDisposableEmail, validateDomainMX } from "../utils/emailValidation.js";
 
 const router = Router();
 
@@ -67,6 +68,17 @@ router.post("/signup", validateSignup, async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
+    // Check disposable email
+    if (isDisposableEmail(email)) {
+      return res.status(400).json({ message: "Disposable email addresses are not allowed" });
+    }
+
+    // Check domain MX records
+    const hasValidMX = await validateDomainMX(email);
+    if (!hasValidMX) {
+      return res.status(400).json({ message: "Email domain is not valid or cannot receive emails" });
+    }
+
     // Validate username
     const usernameValidation = validateUsername(username.trim());
     if (!usernameValidation.valid) {
@@ -95,22 +107,32 @@ router.post("/signup", validateSignup, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Create user
     const user = await User.create({
       username: username.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
+      verificationToken,
+      verificationTokenExpires,
     });
+
+    // Send verification email
+    await sendVerificationEmail(user.email, verificationToken, user.username);
 
     if (user) {
       return res.status(201).json({
         success: true,
         error: false,
-        message: "Signup successful",
+        message: "Signup successful. Please check your email to verify your account.",
         data: {
           _id: user._id,
           username: user.username,
           email: user.email,
+          isVerified: user.isVerified,
           token: generateToken(user._id),
         },
       });
@@ -167,11 +189,12 @@ router.post("/login", validateLogin, async (req, res) => {
     return res.json({
       success: true,
       error: false,
-      message: "Login successful",
+      message: user.isVerified ? "Login successful" : "Login successful. Please verify your email for full access.",
       data: {
         _id: user._id,
         username: user.username,
         email: user.email,
+        isVerified: user.isVerified,
         token: generateToken(user._id),
       },
     });
@@ -326,6 +349,80 @@ router.put("/change-password", protect, async (req, res) => {
   } catch (error) {
     console.error("Change password error:", error);
     return res.status(500).json({ message: "Server error during password change" });
+  }
+});
+
+// @desc    Verify email with token
+// @route   POST /api/auth/verify-email
+// @access  Public
+router.post("/verify-email", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Verification token required" });
+    }
+
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification token" });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+    user.verificationTokenExpires = null;
+    user.emailVerifiedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      error: false,
+      message: "Email verified successfully"
+    });
+  } catch (error) {
+    console.error("Email verification error:", error);
+    res.status(500).json({ message: "Server error during email verification" });
+  }
+});
+
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Private
+router.post("/resend-verification", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpires = verificationTokenExpires;
+    await user.save();
+
+    // Send verification email
+    await sendVerificationEmail(user.email, verificationToken, user.username);
+
+    res.json({
+      success: true,
+      error: false,
+      message: "Verification email sent successfully"
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ message: "Server error during resend verification" });
   }
 });
 

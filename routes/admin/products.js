@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Product, Counter, Category } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
-import { isAdmin } from "../../utils/adminMiddleware.js";
+import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 import { exportProductsToCSV } from "../../utils/export.js";
 import { activityMiddleware } from "../../utils/activityLog.js";
 import { clearCachePattern } from "../../utils/cache.js";
@@ -9,6 +9,7 @@ import { uploadSingle, uploadMultiple, deleteImage, getPublicIdFromUrl } from ".
 
 const router = Router();
 const guard = [protect, isAdmin];
+const productGuard = [protect, hasPermission("products")];
 
 // Helper: generate a numeric ID using atomic counter
 const getNextProductId = async () => {

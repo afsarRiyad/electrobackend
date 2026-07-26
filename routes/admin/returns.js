@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ReturnRequest, RefundRequest, Order, User } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
-import { isAdmin } from "../../utils/adminMiddleware.js";
+import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 
 const router = Router();
 
