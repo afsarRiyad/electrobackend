@@ -95,32 +95,22 @@ router.post("/signup", validateSignup, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
     // Create user
     const user = await User.create({
       username: username.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
-      verificationToken,
-      verificationTokenExpires,
     });
-
-    // Send verification email
-    await sendVerificationEmail(user.email, verificationToken, user.username);
 
     if (user) {
       return res.status(201).json({
         success: true,
         error: false,
-        message: "Signup successful. Please check your email to verify your account.",
+        message: "Signup successful",
         data: {
           _id: user._id,
           username: user.username,
           email: user.email,
-          isVerified: user.isVerified,
           token: generateToken(user._id),
         },
       });
