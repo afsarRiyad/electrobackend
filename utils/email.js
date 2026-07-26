@@ -19,7 +19,7 @@ export const sendOTPEmail = async (email, otp, username) => {
       },
       body: JSON.stringify({
         sender: {
-          email: process.env.EMAIL_FROM_NAME ? `${process.env.EMAIL_FROM_NAME}@${process.env.BREVO_SENDER_DOMAIN || 'brevo.com'}` : 'noreply@brevo.com',
+          email: process.env.EMAIL_FROM || 'noreply@brevo.com',
           name: process.env.EMAIL_FROM_NAME || 'Electro'
         },
         to: [{ email: email }],
@@ -79,7 +79,7 @@ export const sendPasswordResetEmail = async (email, resetToken, username) => {
       },
       body: JSON.stringify({
         sender: {
-          email: process.env.EMAIL_FROM_NAME ? `${process.env.EMAIL_FROM_NAME}@${process.env.BREVO_SENDER_DOMAIN || 'brevo.com'}` : 'noreply@brevo.com',
+          email: process.env.EMAIL_FROM || 'noreply@brevo.com',
           name: process.env.EMAIL_FROM_NAME || 'Electro'
         },
         to: [{ email: email }],
@@ -206,7 +206,7 @@ export const sendWelcomeEmail = async (email, username) => {
       },
       body: JSON.stringify({
         sender: {
-          email: process.env.EMAIL_FROM_NAME ? `${process.env.EMAIL_FROM_NAME}@${process.env.BREVO_SENDER_DOMAIN || 'brevo.com'}` : 'noreply@brevo.com',
+          email: process.env.EMAIL_FROM || 'noreply@brevo.com',
           name: process.env.EMAIL_FROM_NAME || 'Electro'
         },
         to: [{ email: email }],
