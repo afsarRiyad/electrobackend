@@ -341,7 +341,7 @@ router.put("/change-password", protect, async (req, res) => {
   }
 });
 
-// @desc    Verify email with OTP
+// @desc    Verify email with OTP (public - requires email)
 // @route   POST /api/auth/verify-otp
 // @access  Public
 router.post("/verify-otp", async (req, res) => {
@@ -353,6 +353,50 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const validation = validateOTP(otp, user.otp, user.otpExpires);
+
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    user.emailVerifiedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      error: false,
+      message: "Email verified successfully"
+    });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
+  }
+});
+
+// @desc    Verify email with OTP (authenticated - only requires OTP)
+// @route   POST /api/auth/verify-otp/me
+// @access  Private
+router.post("/verify-otp/me", protect, async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ message: "OTP is required" });
+    }
+
+    const user = await User.findById(req.user._id);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
