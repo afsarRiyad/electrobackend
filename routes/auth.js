@@ -4,9 +4,10 @@ import crypto from "crypto";
 import { Router } from "express";
 import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
-import { sendPasswordResetEmail, sendVerificationEmail } from "../utils/email.js";
+import { sendPasswordResetEmail, sendOTPEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
 import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
+import { generateOTP, validateOTP, generateOTPExpiry } from "../utils/otp.js";
 
 const router = Router();
 
@@ -95,22 +96,32 @@ router.post("/signup", validateSignup, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Generate OTP
+    const otp = generateOTP();
+    const otpExpires = generateOTPExpiry();
+
     // Create user
     const user = await User.create({
       username: username.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
+      otp,
+      otpExpires,
     });
+
+    // Send OTP email
+    await sendOTPEmail(user.email, otp, user.username);
 
     if (user) {
       return res.status(201).json({
         success: true,
         error: false,
-        message: "Signup successful",
+        message: "Signup successful. Please check your email for OTP verification.",
         data: {
           _id: user._id,
           username: user.username,
           email: user.email,
+          isVerified: user.isVerified,
           token: generateToken(user._id),
         },
       });
@@ -330,29 +341,36 @@ router.put("/change-password", protect, async (req, res) => {
   }
 });
 
-// @desc    Verify email with token
-// @route   POST /api/auth/verify-email
+// @desc    Verify email with OTP
+// @route   POST /api/auth/verify-otp
 // @access  Public
-router.post("/verify-email", async (req, res) => {
+router.post("/verify-otp", async (req, res) => {
   try {
-    const { token } = req.body;
+    const { email, otp } = req.body;
 
-    if (!token) {
-      return res.status(400).json({ message: "Verification token required" });
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
     }
 
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationTokenExpires: { $gt: Date.now() }
-    });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired verification token" });
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const validation = validateOTP(otp, user.otp, user.otpExpires);
+
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
     }
 
     user.isVerified = true;
-    user.verificationToken = null;
-    user.verificationTokenExpires = null;
+    user.otp = null;
+    user.otpExpires = null;
     user.emailVerifiedAt = new Date();
     await user.save();
 
@@ -362,15 +380,15 @@ router.post("/verify-email", async (req, res) => {
       message: "Email verified successfully"
     });
   } catch (error) {
-    console.error("Email verification error:", error);
-    res.status(500).json({ message: "Server error during email verification" });
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
   }
 });
 
-// @desc    Resend verification email
-// @route   POST /api/auth/resend-verification
+// @desc    Resend OTP
+// @route   POST /api/auth/resend-otp
 // @access  Private
-router.post("/resend-verification", protect, async (req, res) => {
+router.post("/resend-otp", protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
@@ -382,25 +400,23 @@ router.post("/resend-verification", protect, async (req, res) => {
       return res.status(400).json({ message: "Email already verified" });
     }
 
-    // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const otp = generateOTP();
+    const otpExpires = generateOTPExpiry();
 
-    user.verificationToken = verificationToken;
-    user.verificationTokenExpires = verificationTokenExpires;
+    user.otp = otp;
+    user.otpExpires = otpExpires;
     await user.save();
 
-    // Send verification email
-    await sendVerificationEmail(user.email, verificationToken, user.username);
+    await sendOTPEmail(user.email, otp, user.username);
 
     res.json({
       success: true,
       error: false,
-      message: "Verification email sent successfully"
+      message: "OTP sent successfully"
     });
   } catch (error) {
-    console.error("Resend verification error:", error);
-    res.status(500).json({ message: "Server error during resend verification" });
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ message: "Server error during resend OTP" });
   }
 });
 

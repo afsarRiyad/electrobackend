@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { Order, Product, Customer } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
+import { requireVerification } from "../utils/verificationMiddleware.js";
 import { exportOrdersToCSV } from "../utils/export.js";
 import { activityMiddleware } from "../utils/activityLog.js";
 
@@ -51,7 +52,7 @@ router.get("/track/:orderNumber", async (req, res) => {
 
 // ─── GET /api/orders ──────────────────────────────────────────────────
 // Get current user's orders
-router.get("/", protect, async (req, res) => {
+router.get("/", protect, requireVerification, async (req, res) => {
   try {
     const {
       page = 1,
@@ -120,7 +121,7 @@ router.get("/:id", protect, async (req, res) => {
 
 // ─── POST /api/orders ─────────────────────────────────────────────────
 // Create new order
-router.post("/", protect, activityMiddleware('create', 'order'), async (req, res) => {
+router.post("/", protect, requireVerification, activityMiddleware('create', 'order'), async (req, res) => {
   try {
     const {
       items = [],

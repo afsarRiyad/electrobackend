@@ -106,13 +106,27 @@ if (
       },
       async (req, accessToken, refreshToken, idToken, profile, done) => {
         try {
-          const email = profile.email || (req.body && req.body.user ? JSON.parse(req.body.user).email : null);
+          let email = profile.email;
+          if (!email && req.body && req.body.user) {
+            try {
+              email = JSON.parse(req.body.user).email;
+            } catch (e) {
+              console.error("Failed to parse Apple user data:", e.message);
+            }
+          }
           
           if (!email) {
             return done(new Error("No email found in Apple profile"));
           }
 
-          const appleId = profile.id || (req.body && req.body.user ? JSON.parse(req.body.user).sub : null);
+          let appleId = profile.id;
+          if (!appleId && req.body && req.body.user) {
+            try {
+              appleId = JSON.parse(req.body.user).sub;
+            } catch (e) {
+              console.error("Failed to parse Apple user data:", e.message);
+            }
+          }
 
           if (!appleId) {
             return done(new Error("No Apple ID found"));

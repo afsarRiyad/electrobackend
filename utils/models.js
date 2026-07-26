@@ -21,10 +21,10 @@ const userSchema = new mongoose.Schema(
       resource: { type: String }, // products, orders, users, categories, etc.
       actions: [{ type: String }], // create, read, update, delete
     }],
-    // Email verification
+    // Email verification (OTP)
     isVerified: { type: Boolean, default: false },
-    verificationToken: { type: String, default: null },
-    verificationTokenExpires: { type: Date, default: null },
+    otp: { type: String, default: null },
+    otpExpires: { type: Date, default: null },
     emailVerifiedAt: { type: Date, default: null },
     // OAuth providers
     oauthProviders: {
