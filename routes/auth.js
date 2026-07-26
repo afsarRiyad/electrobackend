@@ -7,7 +7,6 @@ import { protect } from "../utils/authMiddleware.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
 import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
-import { isDisposableEmail, validateDomainMX } from "../utils/emailValidation.js";
 
 const router = Router();
 
@@ -66,29 +65,6 @@ router.post("/signup", validateSignup, async (req, res) => {
     // Validate email format
     if (!validateEmail(email)) {
       return res.status(400).json({ message: "Invalid email format" });
-    }
-
-    // Check disposable email
-    if (isDisposableEmail(email)) {
-      return res.status(400).json({ message: "Disposable email addresses are not allowed" });
-    }
-
-    // Check domain MX records (with timeout)
-    let hasValidMX = false;
-    try {
-      const mxPromise = validateDomainMX(email);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('MX validation timeout')), 5000)
-      );
-      hasValidMX = await Promise.race([mxPromise, timeoutPromise]);
-    } catch (error) {
-      console.error('MX validation error:', error.message);
-      // Continue even if MX validation fails - it might be a network issue
-      hasValidMX = true; 
-    }
-    
-    if (!hasValidMX) {
-      return res.status(400).json({ message: "Email domain is not valid or cannot receive emails" });
     }
 
     // Validate username
