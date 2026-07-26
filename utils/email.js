@@ -1,34 +1,21 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { generateOTP } from "./otp.js";
 
-// Create transporter
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: process.env.EMAIL_PORT || 587,
-    secure: process.env.EMAIL_SECURE === "true", // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    // Force IPv4 and improve connection reliability
-    family: 4, // Force IPv4
-    connectionTimeout: 10000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-    tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
-    },
-  });
-};
+// Initialize Resend client
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Send OTP verification email
 export const sendOTPEmail = async (email, otp, username) => {
   try {
-    const transporter = createTransporter();
-    
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'TechMart'}" <${process.env.EMAIL_USER}>`,
+    if (!resend) {
+      console.error("Resend client not initialized. Missing RESEND_API_KEY.");
+      return false;
+    }
+
+    const data = await resend.emails.send({
+      from: process.env.EMAIL_FROM_NAME 
+        ? `${process.env.EMAIL_FROM_NAME} <onboarding@resend.dev>` 
+        : 'Electro <onboarding@resend.dev>',
       to: email,
       subject: "Verify Your Email - OTP Code",
       html: `
@@ -43,22 +30,22 @@ export const sendOTPEmail = async (email, otp, username) => {
           <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #2563eb;">Verify Your Email Address</h2>
             <p>Hi ${username},</p>
-            <p>Thank you for signing up for TechMart! Please use the following OTP code to verify your email address:</p>
+            <p>Thank you for signing up for Electro! Please use the following OTP code to verify your email address:</p>
             <div style="text-align: center; margin: 30px 0; background-color: #f3f4f6; padding: 20px; border-radius: 8px;">
               <span style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 5px;">${otp}</span>
             </div>
             <p>This OTP code will expire in 10 minutes.</p>
             <p>If you didn't create an account, please ignore this email.</p>
             <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
-              © ${new Date().getFullYear()} TechMart. All rights reserved.
+              © ${new Date().getFullYear()} Electro. All rights reserved.
             </p>
           </div>
         </body>
         </html>
       `,
-    };
+    });
 
-    await transporter.sendMail(mailOptions);
+    console.log("OTP email sent successfully:", data);
     return true;
   } catch (error) {
     console.error("OTP email error:", error);
@@ -69,13 +56,17 @@ export const sendOTPEmail = async (email, otp, username) => {
 // Send password reset email
 export const sendPasswordResetEmail = async (email, resetToken, username) => {
   try {
-    const transporter = createTransporter();
-    
-    // Create reset URL (adjust frontend URL as needed)
+    if (!resend) {
+      console.error("Resend client not initialized. Missing RESEND_API_KEY.");
+      return { success: false, error: "Email service not configured" };
+    }
+
     const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-    
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'TechMart'}" <${process.env.EMAIL_USER}>`,
+
+    const data = await resend.emails.send({
+      from: process.env.EMAIL_FROM_NAME 
+        ? `${process.env.EMAIL_FROM_NAME} <onboarding@resend.dev>` 
+        : 'Electro <onboarding@resend.dev>',
       to: email,
       subject: "Password Reset Request",
       html: `
@@ -165,18 +156,17 @@ export const sendPasswordResetEmail = async (email, resetToken, username) => {
               </div>
             </div>
             <div class="footer">
-              <p>This is an automated email from TechMart. Please do not reply to this message.</p>
-              <p>© ${new Date().getFullYear()} TechMart. All rights reserved.</p>
+              <p>This is an automated email from Electro. Please do not reply to this message.</p>
+              <p>© ${new Date().getFullYear()} Electro. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Password reset email sent:", info.messageId);
-    return { success: true, messageId: info.messageId };
+    console.log("Password reset email sent successfully:", data);
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error("Error sending password reset email:", error);
     return { success: false, error: error.message };
@@ -186,12 +176,17 @@ export const sendPasswordResetEmail = async (email, resetToken, username) => {
 // Send welcome email
 export const sendWelcomeEmail = async (email, username) => {
   try {
-    const transporter = createTransporter();
-    
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'TechMart'}" <${process.env.EMAIL_USER}>`,
+    if (!resend) {
+      console.error("Resend client not initialized. Missing RESEND_API_KEY.");
+      return false;
+    }
+
+    const data = await resend.emails.send({
+      from: process.env.EMAIL_FROM_NAME 
+        ? `${process.env.EMAIL_FROM_NAME} <onboarding@resend.dev>` 
+        : 'Electro <onboarding@resend.dev>',
       to: email,
-      subject: "Welcome to TechMart!",
+      subject: "Welcome to Electro!",
       html: `
         <!DOCTYPE html>
         <html>
@@ -269,20 +264,19 @@ export const sendWelcomeEmail = async (email, username) => {
               <p>If you have any questions, feel free to reach out to our support team.</p>
             </div>
             <div class="footer">
-              <p>This is an automated email from TechMart. Please do not reply to this message.</p>
-              <p>© ${new Date().getFullYear()} TechMart. All rights reserved.</p>
+              <p>This is an automated email from Electro. Please do not reply to this message.</p>
+              <p>© ${new Date().getFullYear()} Electro. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Welcome email sent:", info.messageId);
-    return { success: true, messageId: info.messageId };
+    console.log("Welcome email sent successfully:", data);
+    return true;
   } catch (error) {
     console.error("Error sending welcome email:", error);
-    return { success: false, error: error.message };
+    return false;
   }
 };

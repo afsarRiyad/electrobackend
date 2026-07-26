@@ -109,8 +109,10 @@ router.post("/signup", validateSignup, async (req, res) => {
       otpExpires,
     });
 
-    // Send OTP email
-    await sendOTPEmail(user.email, otp, user.username);
+    // Send OTP email (non-blocking - don't await)
+    sendOTPEmail(user.email, otp, user.username).catch(err => {
+      console.error("Failed to send OTP email:", err);
+    });
 
     if (user) {
       return res.status(201).json({
