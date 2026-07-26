@@ -4,7 +4,8 @@ import { products } from "../data/products.js";
 import { clearProductCache } from "./productQueries.js";
 
 export const connectDB = async () => {
-  try {
+  try {    const connUri = process.env.MONGODB_URI || "mongodb+srv://riyad:riyad2@cluster0.iipnz70.mongodb.net/techmart?retryWrites=true&w=majority&appName=Cluster0";
+  
     const connUri = process.env.MONGODB_URI;
     if (!connUri) {
       throw new Error("MONGODB_URI is required");

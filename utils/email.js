@@ -11,6 +11,14 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // Force IPv4 and improve connection reliability
+    family: 4, // Force IPv4
+    connectionTimeout: 10000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+    },
   });
 };
 
