@@ -28,6 +28,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
     });
 
     if (!user) {
+      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
       recordFailedLogin(username.toLowerCase().trim(), 'account');
       await logActivity({
         user: null,
@@ -68,6 +69,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
       recordFailedLogin(username.toLowerCase().trim(), 'account');
       await logActivity({
         user: user._id,
@@ -82,6 +84,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
     }
 
     // Record successful login to reset attempts
+    recordSuccessfulLogin(req.ip || req.connection.remoteAddress, 'ip');
     recordSuccessfulLogin(username.toLowerCase().trim(), 'account');
 
     // Log successful admin login
@@ -95,14 +98,24 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
       userAgent: req.get("user-agent"),
     });
 
+    // Generate token and set as HTTP-only cookie
+    const token = generateToken(user._id);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     return res.json({
+      message: "Admin login successful",
       data: {
         _id: user._id,
         username: user.username,
         email: user.email,
         role: user.role,
         avatar: user.avatar,
-        token: generateToken(user._id),
       },
     });
   } catch (err) {
@@ -157,12 +170,15 @@ router.post("/make-admin", protect, isAdmin, csrfProtection, async (req, res) =>
     const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
+    const existingUser = await User.findById(userId).select("-password");
+    if (!existingUser) return res.status(404).json({ message: "User not found" });
+
+    const previousRole = existingUser.role;
     const user = await User.findByIdAndUpdate(
       userId,
       { role: "admin" },
-      { new: true, select: "-password" }
+      { new: true, runValidators: true, select: "-password" }
     );
-    if (!user) return res.status(404).json({ message: "User not found" });
 
     // Log role change
     await logActivity({
@@ -171,7 +187,7 @@ router.post("/make-admin", protect, isAdmin, csrfProtection, async (req, res) =>
       entity: "user",
       entityId: userId,
       details: { 
-        previousRole: user.role, 
+        previousRole,
         newRole: "admin",
         targetUser: user.username 
       },
@@ -241,6 +257,14 @@ router.post("/logout", protect, isAdmin, async (req, res) => {
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
+    });
+
+    // Clear HTTP-only cookie
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
     });
 
     return res.json({ message: "Logged out successfully" });

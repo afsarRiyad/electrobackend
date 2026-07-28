@@ -20,6 +20,10 @@ setInterval(() => {
 /**
  * Check if IP or account is rate limited
  * Returns object with { allowed: boolean, delayMs: number, remainingAttempts: number }
+ *
+ * This function intentionally does not mutate the attempt counters. Counters are
+ * updated only after a failed authentication so successful logins are never
+ * treated as failed attempts.
  */
 export const checkLoginAttempt = (identifier, type = 'ip') => {
   const key = `${type}:${identifier}`;
@@ -41,17 +45,8 @@ export const checkLoginAttempt = (identifier, type = 'ip') => {
   const attempts = loginAttempts.get(key);
   
   if (!attempts || attempts.expiresAt < now) {
-    // Reset or initialize
-    loginAttempts.set(key, {
-      count: 1,
-      expiresAt: now + (15 * 60 * 1000), // 15 minute window
-      firstAttempt: now
-    });
-    return { allowed: true, remainingAttempts: 4 };
+    return { allowed: true, remainingAttempts: 5 };
   }
-  
-  attempts.count += 1;
-  loginAttempts.set(key, attempts);
   
   const remainingAttempts = 5 - attempts.count;
   
@@ -81,9 +76,9 @@ export const checkLoginAttempt = (identifier, type = 'ip') => {
     };
   }
   
-  // Add progressive delay for 3rd and 4th attempts
+  // Add progressive delay after the 3rd and 4th failed attempts
   if (attempts.count >= 3) {
-    const delayMs = (attempts.count - 2) * 1000; // 1s for 3rd, 2s for 4th attempt
+    const delayMs = (attempts.count - 2) * 1000; // 1s after 3rd, 2s after 4th failure
     return {
       allowed: true,
       delayMs,
@@ -153,8 +148,9 @@ export const loginAttemptMiddleware = async (req, res, next) => {
   }
   
   // If username provided, also check account-based rate limiting
+  let accountCheck = null;
   if (username) {
-    const accountCheck = checkLoginAttempt(username.toLowerCase().trim(), 'account');
+    accountCheck = checkLoginAttempt(username.toLowerCase().trim(), 'account');
     if (!accountCheck.allowed) {
       if (accountCheck.locked) {
         return res.status(423).json({
@@ -167,7 +163,7 @@ export const loginAttemptMiddleware = async (req, res, next) => {
   }
   
   // Attach check results to request for use in route handlers
-  req.loginAttemptCheck = { ip: ipCheck, account: username ? accountCheck : null };
+  req.loginAttemptCheck = { ip: ipCheck, account: accountCheck };
   next();
 };
 

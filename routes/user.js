@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { User, Order, Product, Message } from "../utils/models.js";
+import { User, Order, Product, Message, Download, PaymentMethod } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { validateMessage } from "../utils/validation.js";
 

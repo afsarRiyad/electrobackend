@@ -12,11 +12,12 @@ router.get("/", protect, isAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 20, status, priority, category, search } = req.query;
     
+    const recipientFilter = [
+      { recipient: req.user._id }, // Messages sent directly to this admin
+      { recipient: null }, // Messages sent to all admins
+    ];
     const query = {
-      $or: [
-        { recipient: req.user._id }, // Messages sent directly to this admin
-        { recipient: null }, // Messages sent to all admins
-      ],
+      $or: recipientFilter,
       isArchived: false,
     };
 
@@ -32,9 +33,17 @@ router.get("/", protect, isAdmin, async (req, res) => {
 
     // Search in subject and body
     if (search) {
-      query.$or = [
-        { subject: { $regex: search, $options: "i" } },
-        { body: { $regex: search, $options: "i" } },
+      // Keep the recipient filter when searching; replacing query.$or here
+      // would let an admin search messages that were not addressed to them.
+      delete query.$or;
+      query.$and = [
+        { $or: recipientFilter },
+        {
+          $or: [
+            { subject: { $regex: search, $options: "i" } },
+            { body: { $regex: search, $options: "i" } },
+          ],
+        },
       ];
     }
 

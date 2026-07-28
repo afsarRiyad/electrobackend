@@ -1,9 +1,10 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+import "dotenv/config";
 import compression from "compression";
 import helmet from "helmet";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 
 // ─── Existing routes ──────────────────────────────────────────────────────────
 import productRoutes from "./routes/products.js";
@@ -35,9 +36,6 @@ import { apiCache, productCache, noCache } from "./utils/cacheHeaders.js";
 import { passport } from "./utils/oauth.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
-
-
-dotenv.config();
 console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 
 const app = express();
@@ -102,6 +100,9 @@ const port = process.env.PORT || 5000;
 // Increase JSON payload limit
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Cookie parser for HTTP-only cookies
+app.use(cookieParser());
 
 // Compression configuration
 app.use(compression({
@@ -391,4 +392,3 @@ const gracefulShutdown = async (signal) => {
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-

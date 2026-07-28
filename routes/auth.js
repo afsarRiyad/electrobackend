@@ -14,7 +14,7 @@ const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 // ─── POST /api/auth/signup ───────────────────────────────────────────────
-router.post("/signup", csrfProtection, validateSignup, async (req, res) => {
+router.post("/signup", validateSignup, async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -79,6 +79,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
     });
 
     if (!user) {
+      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
       recordFailedLogin(username.toLowerCase().trim(), 'account');
       await logActivity({
         user: null,
@@ -106,6 +107,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
       recordFailedLogin(username.toLowerCase().trim(), 'account');
       await logActivity({
         user: user._id,
@@ -120,6 +122,7 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
     }
 
     // Record successful login to reset attempts
+    recordSuccessfulLogin(req.ip || req.connection.remoteAddress, 'ip');
     recordSuccessfulLogin(username.toLowerCase().trim(), 'account');
     
     // Log successful login
@@ -133,14 +136,24 @@ router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) =>
       userAgent: req.get("user-agent"),
     });
 
+    // Generate token and set as HTTP-only cookie
+    const token = generateToken(user._id);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     return res.json({
+      message: "Login successful",
       data: {
         _id: user._id,
         username: user.username,
         email: user.email,
         role: user.role,
         avatar: user.avatar,
-        token: generateToken(user._id),
       },
     });
   } catch (err) {
@@ -161,6 +174,14 @@ router.post("/logout", protect, async (req, res) => {
       details: { email: req.user.email, username: req.user.username },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
+    });
+
+    // Clear HTTP-only cookie
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
     });
 
     return res.json({ message: "Logged out successfully" });
