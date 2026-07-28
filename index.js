@@ -69,20 +69,22 @@ const allowedOrigins = [
   process.env.CLIENT_URL, // Client frontend domain
 ].filter(Boolean);
 
+// Allow localhost for testing (can be disabled by setting ALLOW_LOCALHOST=false)
+const allowLocalhost = process.env.ALLOW_LOCALHOST !== "false";
+
 app.use(
   cors({
     origin(origin, callback) {
-      // In production, require origin. In development, allow localhost
-      if (!origin) {
-        return callback(new Error("Origin header is required"));
-      }
+      // Allow requests with no Origin (Postman, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
 
+      // Check if origin is in allowed list
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      // Allow localhost in development only
-      if (isDevelopment && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
+      // Allow localhost for testing (both development and production)
+      if (allowLocalhost && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
         return callback(null, true);
       }
 
