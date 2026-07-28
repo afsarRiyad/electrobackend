@@ -63,26 +63,26 @@ if (isDevelopment) {
   app.use(morgan("dev"));
 }
 
-// CORS configuration
+// CORS configuration - Strict mode: only allow configured dashboard domain
 const allowedOrigins = [
-  process.env.CLIENT_URL,
-  process.env.ADMIN_URL,
-  "http://localhost:5173", 
-  "http://localhost:5174", 
-  "http://localhost:3000", 
-  "http://localhost:3001", 
-  "https://dashboard-omega-lilac-63.vercel.app",
-  "https://tech-mart-six.vercel.app",
-  "https://dashboard-j6az-tau.vercel.app",
+  process.env.ADMIN_URL, // Only the real dashboard domain
+  process.env.CLIENT_URL, // Client frontend domain
 ].filter(Boolean);
 
 app.use(
   cors({
     origin(origin, callback) {
-      // Allow requests with no Origin (Postman, mobile apps, server-to-server)
-      if (!origin) return callback(null, true);
+      // In production, require origin. In development, allow localhost
+      if (!origin) {
+        return callback(new Error("Origin header is required"));
+      }
 
       if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow localhost in development only
+      if (isDevelopment && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
         return callback(null, true);
       }
 
@@ -91,6 +91,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400, // Cache preflight requests for 24 hours
   })
 );
 

@@ -4,6 +4,10 @@ import { Router } from "express";
 import { User } from "../../utils/models.js";
 import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin } from "../../utils/adminMiddleware.js";
+import { logActivity } from "../../utils/activityLog.js";
+import { loginAttemptMiddleware, recordSuccessfulLogin, recordFailedLogin } from "../../utils/loginAttemptTracker.js";
+import { getCSRFToken, csrfProtection } from "../../utils/csrfProtection.js";
+import { validateLogin } from "../../utils/validation.js";
 
 const router = Router();
 
@@ -12,7 +16,7 @@ const generateToken = (id) =>
 
 // ─── POST /api/admin/auth/login ───────────────────────────────────────────────
 // Admin login — verifies role === 'admin'
-router.post("/login", async (req, res) => {
+router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) => {
   try {
     const { username, password } = req.body || {};
     
@@ -23,14 +27,73 @@ router.post("/login", async (req, res) => {
       $or: [{ email: username.toLowerCase().trim() }, { username: username.trim() }],
     });
 
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
-    if (user.role !== "admin")
+    if (!user) {
+      recordFailedLogin(username.toLowerCase().trim(), 'account');
+      await logActivity({
+        user: null,
+        action: "login_failure",
+        entity: "user",
+        details: { reason: "user_not_found", identifier: username, type: "admin" },
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    
+    if (user.role !== "admin") {
+      await logActivity({
+        user: user._id,
+        action: "login_failure",
+        entity: "user",
+        entityId: user._id,
+        details: { reason: "not_admin", role: user.role },
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
       return res.status(403).json({ message: "Access denied. Admin account required." });
-    if (user.status === "suspended")
+    }
+    
+    if (user.status === "suspended") {
+      await logActivity({
+        user: user._id,
+        action: "login_failure",
+        entity: "user",
+        entityId: user._id,
+        details: { reason: "account_suspended" },
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
       return res.status(403).json({ message: "Account suspended. Contact support." });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (!isMatch) {
+      recordFailedLogin(username.toLowerCase().trim(), 'account');
+      await logActivity({
+        user: user._id,
+        action: "login_failure",
+        entity: "user",
+        entityId: user._id,
+        details: { reason: "invalid_password", type: "admin" },
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Record successful login to reset attempts
+    recordSuccessfulLogin(username.toLowerCase().trim(), 'account');
+
+    // Log successful admin login
+    await logActivity({
+      user: user._id,
+      action: "login_success",
+      entity: "user",
+      entityId: user._id,
+      details: { email: user.email, username: user.username, role: user.role, type: "admin" },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
 
     return res.json({
       data: {
@@ -55,7 +118,7 @@ router.get("/me", protect, isAdmin, (req, res) => {
 
 // ─── PUT /api/admin/auth/profile ──────────────────────────────────────────────
 // Update admin's own profile
-router.put("/profile", protect, isAdmin, async (req, res) => {
+router.put("/profile", protect, isAdmin, csrfProtection, async (req, res) => {
   try {
     const allowed = ["username", "email", "avatar", "phone", "address"];
     const updates = {};
@@ -89,7 +152,7 @@ router.put("/profile", protect, isAdmin, async (req, res) => {
 
 // ─── POST /api/admin/auth/make-admin ─────────────────────────────────────────
 // Promote any user to admin (admin only)
-router.post("/make-admin", protect, isAdmin, async (req, res) => {
+router.post("/make-admin", protect, isAdmin, csrfProtection, async (req, res) => {
   try {
     const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ message: "userId is required" });
@@ -101,6 +164,21 @@ router.post("/make-admin", protect, isAdmin, async (req, res) => {
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Log role change
+    await logActivity({
+      user: req.user._id,
+      action: "role_change",
+      entity: "user",
+      entityId: userId,
+      details: { 
+        previousRole: user.role, 
+        newRole: "admin",
+        targetUser: user.username 
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
     return res.json({ message: `${user.username} is now an admin`, data: user });
   } catch (err) {
     console.error("Make-admin error:", err);
@@ -110,7 +188,7 @@ router.post("/make-admin", protect, isAdmin, async (req, res) => {
 
 // ─── POST /api/admin/auth/revoke-admin ───────────────────────────────────────
 // Revoke admin role (admin only)
-router.post("/revoke-admin", protect, isAdmin, async (req, res) => {
+router.post("/revoke-admin", protect, isAdmin, csrfProtection, async (req, res) => {
   try {
     const { userId } = req.body || {};
     if (!userId) return res.status(400).json({ message: "userId is required" });
@@ -124,11 +202,56 @@ router.post("/revoke-admin", protect, isAdmin, async (req, res) => {
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Log role change
+    await logActivity({
+      user: req.user._id,
+      action: "role_change",
+      entity: "user",
+      entityId: userId,
+      details: { 
+        previousRole: "admin", 
+        newRole: "user",
+        targetUser: user.username 
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
     return res.json({ message: `${user.username} admin role revoked`, data: user });
   } catch (err) {
     console.error("Revoke-admin error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
+
+// ─── POST /api/admin/auth/logout ───────────────────────────────────────────────
+// Admin logout
+router.post("/logout", protect, isAdmin, async (req, res) => {
+  try {
+    // Log logout
+    await logActivity({
+      user: req.user._id,
+      action: "logout",
+      entity: "user",
+      entityId: req.user._id,
+      details: { 
+        email: req.user.email, 
+        username: req.user.username,
+        role: req.user.role 
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    return res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Admin logout error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── GET /api/admin/auth/csrf-token ───────────────────────────────────────────
+// Get CSRF token for authenticated admin requests
+router.get("/csrf-token", protect, isAdmin, getCSRFToken);
 
 export default router;
