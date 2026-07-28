@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // Common response
 const rateLimitMessage = (message) => ({
@@ -12,7 +12,7 @@ export const generalLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+  keyGenerator: ipKeyGenerator,
   message: rateLimitMessage(
     "Too many requests. Please try again in a few minutes."
   ),
@@ -26,7 +26,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    const ip = req.ip || req.connection.remoteAddress;
+    const ip = ipKeyGenerator(req);
     const username = req.body?.username || req.body?.email;
     return username ? `${ip}:${username.toLowerCase().trim()}` : ip;
   },
@@ -41,7 +41,7 @@ export const adminLimiter = rateLimit({
   max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+  keyGenerator: ipKeyGenerator,
   message: rateLimitMessage(
     "Too many admin requests. Please slow down and try again."
   ),
@@ -53,7 +53,7 @@ export const uploadLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+  keyGenerator: ipKeyGenerator,
   message: rateLimitMessage(
     "Upload limit exceeded. Please try again later."
   ),
