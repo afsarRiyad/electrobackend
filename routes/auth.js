@@ -1,369 +1,228 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { Router } from "express";
 import { User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
-import { validateLogin, validateSignup } from "../utils/validation.js";
-import { logActivity } from "../utils/activityLog.js";
-import { loginAttemptMiddleware, recordSuccessfulLogin, recordFailedLogin } from "../utils/loginAttemptTracker.js";
-import { getCSRFToken, csrfProtection } from "../utils/csrfProtection.js";
-import { generateOTP, storeOTP, verifyOTP, hasOTP, getOTPExpiry } from "../utils/otpService.js";
-import { sendOTPEmail, sendWelcomeEmail } from "../utils/emailService.js";
+import { sendPasswordResetEmail, sendOTPEmail } from "../utils/email.js";
+import { validateSignup, validateLogin } from "../utils/validation.js";
+import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
+import { generateOTP, validateOTP, generateOTPExpiry } from "../utils/otp.js";
 
 const router = Router();
 
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-// Vercel and Render use different sites, so production requests need a
-// cross-site cookie. Local development remains protected by SameSite=Strict.
-const authCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: "/",
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
 };
 
-const clearAuthCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-  path: "/",
+// Validation helpers
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 };
 
-// ─── POST /api/auth/send-otp ───────────────────────────────────────────────
-// Send OTP for email verification
-router.post("/send-otp", async (req, res) => {
-  try {
-    const { email, purpose = 'signup' } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    // Check if user already exists (for signup)
-    if (purpose === 'signup') {
-      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists with this email" });
-      }
-    }
-
-    // Generate and store OTP
-    const otp = generateOTP();
-    const expiresAt = storeOTP(email, otp, purpose);
-
-    // Send OTP email
-    await sendOTPEmail(email, otp, purpose);
-
-    return res.json({
-      message: "OTP sent successfully",
-      data: {
-        email,
-        expiresAt: new Date(expiresAt).toISOString(),
-      },
-    });
-  } catch (err) {
-    console.error("Send OTP error:", err);
-    return res.status(500).json({ message: "Failed to send OTP" });
+const validatePassword = (password) => {
+  if (password.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters" };
   }
-});
-
-// ─── POST /api/auth/verify-otp ─────────────────────────────────────────────
-// Verify OTP code and mark user as verified
-router.post("/verify-otp", async (req, res) => {
-  try {
-    const { email, otp, purpose = 'signup' } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({ message: "Email and OTP are required" });
-    }
-
-    // Verify OTP
-    const result = verifyOTP(email, otp, purpose);
-
-    if (!result.valid) {
-      return res.status(400).json({ message: result.message });
-    }
-
-    // If signup purpose, mark user as verified
-    if (purpose === 'signup') {
-      const user = await User.findOne({ email: email.toLowerCase().trim() });
-      if (user) {
-        user.isVerified = true;
-        user.emailVerifiedAt = new Date();
-        user.otp = null;
-        user.otpExpires = null;
-        await user.save();
-
-        // Log verification
-        await logActivity({
-          user: user._id,
-          action: "email_verified",
-          entity: "user",
-          entityId: user._id,
-          details: { email: user.email },
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent"),
-        });
-      }
-
-      return res.json({
-        message: "Email verified successfully",
-        data: {
-          email,
-          verified: true,
-        },
-      });
-    }
-
-    return res.json({
-      message: "OTP verified successfully",
-      data: {
-        email,
-        verified: true,
-      },
-    });
-  } catch (err) {
-    console.error("Verify OTP error:", err);
-    return res.status(500).json({ message: "Server error" });
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one lowercase letter" };
   }
-});
-
-// ─── POST /api/auth/resend-otp ─────────────────────────────────────────────
-// Resend OTP code
-router.post("/resend-otp", async (req, res) => {
-  try {
-    const { email, purpose = 'signup' } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    // Check if there's an existing OTP that hasn't expired
-    const existingOTP = hasOTP(email, purpose);
-    const remainingTime = getOTPExpiry(email, purpose);
-
-    // Rate limiting: if OTP was sent recently, wait before resending
-    if (existingOTP && remainingTime && remainingTime > 120) {
-      return res.status(429).json({
-        message: `Please wait ${Math.floor(remainingTime / 60)} minutes before requesting a new OTP`,
-        remainingTime,
-      });
-    }
-
-    // Generate new OTP
-    const otp = generateOTP();
-    const expiresAt = storeOTP(email, otp, purpose);
-
-    // Send OTP email
-    await sendOTPEmail(email, otp, purpose);
-
-    return res.json({
-      message: "OTP resent successfully",
-      data: {
-        email,
-        expiresAt: new Date(expiresAt).toISOString(),
-      },
-    });
-  } catch (err) {
-    console.error("Resend OTP error:", err);
-    return res.status(500).json({ message: "Failed to resend OTP" });
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one uppercase letter" };
   }
-});
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one number" };
+  }
+  return { valid: true };
+};
 
-// ─── POST /api/auth/signup ───────────────────────────────────────────────
+const validateUsername = (username) => {
+  if (username.length < 3) {
+    return { valid: false, message: "Username must be at least 3 characters" };
+  }
+  if (username.length > 20) {
+    return { valid: false, message: "Username must be less than 20 characters" };
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return { valid: false, message: "Username can only contain letters, numbers, and underscores" };
+  }
+  return { valid: true };
+};
+
+// @desc    Register a new user
+// @route   POST /api/auth/signup
+// @access  Public
 router.post("/signup", validateSignup, async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password } = req.body || {};
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Please fill all fields" });
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Validate username
+    const usernameValidation = validateUsername(username.trim());
+    if (!usernameValidation.valid) {
+      return res.status(400).json({ message: usernameValidation.message });
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
 
     // Check if user exists
-    const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase().trim() }, { username: username.trim() }],
+    const userExists = await User.findOne({
+      $or: [
+        { email: email.toLowerCase().trim() },
+        { username: username.trim() }
+      ],
     });
 
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists with this email or username" });
     }
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user (unverified by default)
+    // Generate OTP
+    const otp = generateOTP();
+    const otpExpires = generateOTPExpiry();
+
+    // Create user
     const user = await User.create({
       username: username.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
-      isVerified: false,
+      otp,
+      otpExpires,
     });
 
-    // Log signup
-    await logActivity({
-      user: user._id,
-      action: "signup",
-      entity: "user",
-      entityId: user._id,
-      details: { email: user.email, username: user.username },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
+    // Send OTP email (non-blocking - don't await)
+    sendOTPEmail(user.email, otp, user.username).catch(err => {
+      console.error("Failed to send OTP email:", err);
     });
 
-    // Send verification OTP
-    const otp = generateOTP();
-    const expiresAt = storeOTP(email, otp, 'signup');
-    await sendOTPEmail(email, otp, 'signup');
-
-    // Sign the user in immediately so they can access dashboard (with limited access)
-    const token = generateToken(user._id);
-    res.cookie("token", token, authCookieOptions);
-
-    return res.status(201).json({
-      message: "User created successfully. Please verify your email to access all features.",
-      data: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isVerified: false,
-        requiresVerification: true,
-      },
-    });
-  } catch (err) {
-    console.error("Signup error:", err);
-    return res.status(500).json({ message: "Server error" });
+    if (user) {
+      return res.status(201).json({
+        success: true,
+        error: false,
+        message: "Signup successful. Please check your email for OTP verification.",
+        data: {
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          isVerified: user.isVerified,
+          token: generateToken(user._id),
+        },
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "Invalid user data"
+      });
+    }
+  } catch (error) {
+    console.error("Signup error:", error);
+    return res.status(500).json({ message: "Server error during registration" });
   }
 });
 
-// ─── POST /api/auth/login ─────────────────────────────────────────────────
-router.post("/login", loginAttemptMiddleware, validateLogin, async (req, res) => {
+// @desc    Authenticate user & get token (login)
+// @route   POST /api/auth/login
+// @access  Public
+router.post("/login", validateLogin, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.body || {}; // username can be email or username (userhandle)
 
     if (!username || !password) {
-      return res.status(400).json({ message: "Username/email and password are required" });
+      return res.status(400).json({ message: "Please enter username/email and password" });
     }
 
+    // Find by username or email
     const user = await User.findOne({
-      $or: [{ email: username.toLowerCase().trim() }, { username: username.trim() }],
+      $or: [
+        { email: username.toLowerCase().trim() },
+        { username: username.trim() }
+      ],
     });
 
+    // Check if user exists
     if (!user) {
-      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
-      recordFailedLogin(username.toLowerCase().trim(), 'account');
-      await logActivity({
-        user: null,
-        action: "login_failure",
-        entity: "user",
-        details: { reason: "user_not_found", identifier: username },
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent"),
+      return res.status(401).json({
+        success: false,
+        error: true,
+        message: "User not found"
       });
-      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    if (user.status === "suspended") {
-      await logActivity({
-        user: user._id,
-        action: "login_failure",
-        entity: "user",
-        entityId: user._id,
-        details: { reason: "account_suspended" },
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent"),
+    // Check password
+    if (!(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        error: true,
+        message: "Incorrect password"
       });
-      return res.status(403).json({ message: "Account suspended. Contact support." });
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      recordFailedLogin(req.ip || req.connection.remoteAddress, 'ip');
-      recordFailedLogin(username.toLowerCase().trim(), 'account');
-      await logActivity({
-        user: user._id,
-        action: "login_failure",
-        entity: "user",
-        entityId: user._id,
-        details: { reason: "invalid_password" },
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent"),
-      });
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    // Record successful login to reset attempts
-    recordSuccessfulLogin(req.ip || req.connection.remoteAddress, 'ip');
-    recordSuccessfulLogin(username.toLowerCase().trim(), 'account');
-    
-    // Log successful login
-    await logActivity({
-      user: user._id,
-      action: "login_success",
-      entity: "user",
-      entityId: user._id,
-      details: { email: user.email, username: user.username },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    // Generate token and set as HTTP-only cookie
-    const token = generateToken(user._id);
-    res.cookie("token", token, authCookieOptions);
 
     return res.json({
-      message: "Login successful",
+      success: true,
+      error: false,
+      message: user.isVerified ? "Login successful" : "Login successful. Please verify your email for full access.",
       data: {
         _id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role,
-        avatar: user.avatar,
+        isVerified: user.isVerified,
+        token: generateToken(user._id),
       },
     });
-  } catch (err) {
-    console.error("Login error:", err);
-    return res.status(500).json({ message: "Server error" });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "Server error during login" });
   }
 });
 
-// ─── POST /api/auth/logout ────────────────────────────────────────────────
-router.post("/logout", protect, async (req, res) => {
-  try {
-    // Log logout
-    await logActivity({
-      user: req.user._id,
-      action: "logout",
-      entity: "user",
-      entityId: req.user._id,
-      details: { email: req.user.email, username: req.user.username },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    // Clear HTTP-only cookie
-    res.clearCookie("token", clearAuthCookieOptions);
-
-    return res.json({ message: "Logged out successfully" });
-  } catch (err) {
-    console.error("Logout error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// ─── GET /api/auth/me ────────────────────────────────────────────────────
-router.get("/me", protect, (req, res) => {
+// @desc    Get user profile
+// @route   GET /api/auth/me
+// @access  Private
+router.get("/me", protect, async (req, res) => {
   return res.json({ data: req.user });
 });
 
-// ─── POST /api/auth/forgot-password ───────────────────────────────────────
-// Send OTP for password reset
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+router.post("/logout", protect, async (req, res) => {
+  return res.json({ message: "Logged out successfully" });
+});
+
+// @desc    Forgot password - Request reset token
+// @route   POST /api/auth/forgot-password
+// @access  Public
 router.post("/forgot-password", async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
 
     if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+      return res.status(400).json({ message: "Please provide your email" });
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
@@ -372,41 +231,127 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ message: "User not found with this email" });
     }
 
-    // Generate and store OTP for password reset
-    const otp = generateOTP();
-    const expiresAt = storeOTP(email, otp, 'forgot-password');
+    // Generate token
+    const resetToken = crypto.randomBytes(20).toString("hex");
 
-    // Send OTP email
-    await sendOTPEmail(email, otp, 'forgot-password');
+    // Save token and expiration to DB
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Send password reset email
+    const emailResult = await sendPasswordResetEmail(user.email, resetToken, user.username);
+    
+    if (!emailResult.success) {
+      console.error("Failed to send password reset email:", emailResult.error);
+      // Still return success to avoid exposing email issues to users
+      // Log the error for debugging
+    }
 
     return res.json({
-      message: "Password reset OTP sent successfully",
-      data: {
-        email,
-        expiresAt: new Date(expiresAt).toISOString(),
-      },
+      message: "Password reset email sent successfully",
+      info: "Please check your email for the password reset link"
     });
-  } catch (err) {
-    console.error("Forgot password error:", err);
-    return res.status(500).json({ message: "Failed to send password reset OTP" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ message: "Server error during forgot password" });
   }
 });
 
-// ─── POST /api/auth/reset-password ───────────────────────────────────────
-// Reset password with OTP
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password
+// @access  Public
 router.post("/reset-password", async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { token, password } = req.body || {};
 
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and new password are required" });
     }
 
-    // Verify OTP
-    const result = verifyOTP(email, otp, 'forgot-password');
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
 
-    if (!result.valid) {
-      return res.status(400).json({ message: result.message });
+    // Find user by token and check expiration
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired password reset token" });
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpire = null;
+    await user.save();
+
+    return res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Server error during password reset" });
+  }
+});
+
+// @desc    Change password (authenticated)
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put("/change-password", protect, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new password are required" });
+    }
+
+    // Validate new password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
+
+    // Find the user (password is not excluded when using findById unless projected out)
+    const user = await User.findById(req.user._id);
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Incorrect current password" });
+    }
+
+    // Check if new password is same as current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "New password must be different from current password" });
+    }
+
+    // Hash and save new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    return res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    return res.status(500).json({ message: "Server error during password change" });
+  }
+});
+
+// @desc    Verify email with OTP (public - requires email)
+// @route   POST /api/auth/verify-otp
+// @access  Public
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
@@ -415,48 +360,134 @@ router.post("/reset-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
 
-    // Update password
-    user.password = hashedPassword;
-    user.resetPasswordToken = null;
-    user.resetPasswordExpire = null;
+    const validation = validateOTP(otp, user.otp, user.otpExpires);
+
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    user.emailVerifiedAt = new Date();
     await user.save();
 
-    // Log password reset
-    await logActivity({
-      user: user._id,
-      action: "password_reset",
-      entity: "user",
-      entityId: user._id,
-      details: { email: user.email },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
+    res.json({
+      success: true,
+      error: false,
+      message: "Email verified successfully"
     });
-
-    return res.json({ message: "Password reset successfully" });
-  } catch (err) {
-    console.error("Reset password error:", err);
-    return res.status(500).json({ message: "Server error" });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
   }
 });
 
-// ─── GET /api/auth/verification-status ───────────────────────────────────
-// Check if user's email is verified
-router.get("/verification-status", protect, (req, res) => {
-  return res.json({
-    data: {
-      isVerified: req.user.isVerified || false,
-      email: req.user.email,
-      emailVerifiedAt: req.user.emailVerifiedAt,
-    },
-  });
+// @desc    Verify email with OTP (authenticated - only requires OTP)
+// @route   POST /api/auth/verify-otp/me
+// @access  Private
+router.post("/verify-otp/me", protect, async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ message: "OTP is required" });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const validation = validateOTP(otp, user.otp, user.otpExpires);
+
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    user.emailVerifiedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      error: false,
+      message: "Email verified successfully"
+    });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
+  }
 });
 
-// ─── GET /api/auth/csrf-token ─────────────────────────────────────────────
-// Get CSRF token for authenticated requests
-router.get("/csrf-token", protect, getCSRFToken);
+// @desc    Resend OTP
+// @route   POST /api/auth/resend-otp
+// @access  Private
+router.post("/resend-otp", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = generateOTPExpiry();
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    await sendOTPEmail(user.email, otp, user.username);
+
+    res.json({
+      success: true,
+      error: false,
+      message: "OTP sent successfully"
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ message: "Server error during resend OTP" });
+  }
+});
+
+// ─── Google OAuth Routes ───────────────────────────────────────────────────────
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login", session: false }),
+  (req, res) => {
+    const token = oauthGenerateToken(req.user._id);
+    res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/auth/callback?token=${token}`);
+  }
+);
+
+// ─── Apple OAuth Routes ─────────────────────────────────────────────────────────
+router.get("/apple", passport.authenticate("apple", { scope: ["email", "name"] }));
+
+router.post(
+  "/apple/callback",
+  passport.authenticate("apple", { failureRedirect: "/login", session: false }),
+  (req, res) => {
+    const token = oauthGenerateToken(req.user._id);
+    res.json({ token, user: req.user });
+  }
+);
 
 export default router;
