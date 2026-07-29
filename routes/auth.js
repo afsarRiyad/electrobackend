@@ -204,8 +204,8 @@ router.get("/me", protect, async (req, res) => {
 
 // @desc    Logout user
 // @route   POST /api/auth/logout
-// @access  Private
-router.post("/logout", protect, async (req, res) => {
+// @access  Public
+router.post("/logout", async (req, res) => {
   return res.json({ message: "Logged out successfully" });
 });
 
