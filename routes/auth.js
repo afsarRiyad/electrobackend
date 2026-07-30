@@ -11,9 +11,15 @@ import { generateOTP, validateOTP, generateOTPExpiry } from "../utils/otp.js";
 
 const router = Router();
 
-const generateToken = (id) => {
+const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
+    expiresIn: "15m", // Short-lived access token
+  });
+};
+
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
+    expiresIn: "7d", // Long-lived refresh token
   });
 };
 
@@ -115,6 +121,29 @@ router.post("/signup", validateSignup, async (req, res) => {
     });
 
     if (user) {
+      // Generate tokens for immediate login after signup
+      const accessToken = generateAccessToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
+
+      // Store refresh token in user document
+      user.refreshTokens.push({
+        token: refreshToken,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        userAgent: req.get("user-agent"),
+        ipAddress: req.ip,
+      });
+      await user.save();
+
+      // Set refresh token as HTTP-only cookie
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: "/",
+      });
+
       return res.status(201).json({
         success: true,
         error: false,
@@ -124,7 +153,7 @@ router.post("/signup", validateSignup, async (req, res) => {
           username: user.username,
           email: user.email,
           isVerified: user.isVerified,
-          token: generateToken(user._id),
+          accessToken,
         },
       });
     } else {
@@ -177,6 +206,29 @@ router.post("/login", validateLogin, async (req, res) => {
       });
     }
 
+    // Generate tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Store refresh token in user document
+    user.refreshTokens.push({
+      token: refreshToken,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
+    await user.save();
+
+    // Set refresh token as HTTP-only cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     return res.json({
       success: true,
       error: false,
@@ -186,7 +238,7 @@ router.post("/login", validateLogin, async (req, res) => {
         username: user.username,
         email: user.email,
         isVerified: user.isVerified,
-        token: generateToken(user._id),
+        accessToken, // Send access token in response
       },
     });
   } catch (error) {
@@ -206,7 +258,107 @@ router.get("/me", protect, async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Public
 router.post("/logout", async (req, res) => {
-  return res.json({ message: "Logged out successfully" });
+  try {
+    // Clear refresh token cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+      path: "/",
+    });
+
+    return res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({ message: "Server error during logout" });
+  }
+});
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh-token
+// @access  Public
+router.post("/refresh-token", async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: "No refresh token provided" });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+    );
+
+    // Find user with this refresh token
+    const user = await User.findOne({
+      _id: decoded.id,
+      "refreshTokens.token": refreshToken,
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    // Check if refresh token is expired
+    const tokenData = user.refreshTokens.find(
+      (t) => t.token === refreshToken
+    );
+
+    if (!tokenData || new Date(tokenData.expiresAt) < new Date()) {
+      // Remove expired token
+      user.refreshTokens = user.refreshTokens.filter(
+        (t) => t.token !== refreshToken
+      );
+      await user.save();
+      return res.status(401).json({ message: "Refresh token expired" });
+    }
+
+    // Generate new access token
+    const newAccessToken = generateAccessToken(user._id);
+
+    // Token rotation: generate new refresh token
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    // Remove old refresh token and add new one
+    user.refreshTokens = user.refreshTokens.filter(
+      (t) => t.token !== refreshToken
+    );
+    user.refreshTokens.push({
+      token: newRefreshToken,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
+    await user.save();
+
+    // Set new refresh token as HTTP-only cookie
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        accessToken: newAccessToken,
+      },
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Refresh token expired" });
+    }
+    return res.status(500).json({ message: "Server error during token refresh" });
+  }
 });
 
 // @desc    Forgot password - Request reset token

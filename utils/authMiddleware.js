@@ -4,16 +4,16 @@ import { User } from "./models.js";
 export const protect = async (req, res, next) => {
   let token;
 
-  // Try to get token from cookie first (HTTP-only cookie)
-  if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
-  }
-  // Fallback to Authorization header for backward compatibility
-  else if (
+  // Try to get token from Authorization header first (access token)
+  if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
   ) {
     token = req.headers.authorization.split(" ")[1];
+  }
+  // Fallback to cookie for backward compatibility
+  else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
   }
 
   if (!token) {
@@ -35,6 +35,9 @@ export const protect = async (req, res, next) => {
     return next();
   } catch (error) {
     console.error("Auth middleware error:", error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired" });
+    }
     return res.status(401).json({ message: "Not authorized, token failed" });
   }
 };

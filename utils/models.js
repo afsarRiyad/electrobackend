@@ -26,6 +26,14 @@ const userSchema = new mongoose.Schema(
     otp: { type: String, default: null },
     otpExpires: { type: Date, default: null },
     emailVerifiedAt: { type: Date, default: null },
+    // Refresh tokens
+    refreshTokens: [{
+      token: { type: String, required: true },
+      createdAt: { type: Date, default: Date.now },
+      expiresAt: { type: Date, required: true },
+      userAgent: { type: String },
+      ipAddress: { type: String },
+    }],
     // OAuth providers
     oauthProviders: {
       google: {
@@ -592,6 +600,84 @@ refundRequestSchema.index({ status: 1 });
 refundRequestSchema.index({ orderNumber: 1 });
 refundRequestSchema.index({ createdAt: -1 });
 
+// ─── COUPON ─────────────────────────────────────────────────────────────────────
+const couponSchema = new mongoose.Schema(
+  {
+    code: {
+      type: String,
+      required: true,
+      unique: true,
+      uppercase: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      default: null,
+    },
+    discountType: {
+      type: String,
+      enum: ["percentage", "fixed"],
+      required: true,
+    },
+    discountValue: {
+      type: Number,
+      required: true,
+    },
+    minimumOrderAmount: {
+      type: Number,
+      default: 0,
+    },
+    maximumDiscountAmount: {
+      type: Number,
+      default: null,
+    },
+    usageLimit: {
+      type: Number,
+      default: null, // null means unlimited
+    },
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
+    userLimit: {
+      type: Number,
+      default: 1, // How many times a single user can use this coupon
+    },
+    validFrom: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    validUntil: {
+      type: Date,
+      required: true,
+    },
+    applicableProducts: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+    }],
+    applicableCategories: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    }],
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
+
+couponSchema.index({ code: 1 });
+couponSchema.index({ validFrom: 1, validUntil: 1 });
+couponSchema.index({ isActive: 1 });
+
 export const Message = mongoose.model("Message", messageSchema);
 export const ReturnRequest = mongoose.model("ReturnRequest", returnRequestSchema);
 export const RefundRequest = mongoose.model("RefundRequest", refundRequestSchema);
+export const Coupon = mongoose.model("Coupon", couponSchema);
