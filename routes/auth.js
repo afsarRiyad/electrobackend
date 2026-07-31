@@ -650,12 +650,15 @@ router.get(
   "/google/callback",
   (req, res, next) => {
     console.log("Google callback received:", req.query);
+    console.log("CLIENT_URL:", process.env.CLIENT_URL);
     next();
   },
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
   (req, res) => {
     const token = oauthGenerateToken(req.user._id);
-    res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/auth/callback?token=${token}`);
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    console.log("Redirecting to:", `${clientUrl}/auth/callback?token=${token}`);
+    res.redirect(`${clientUrl}/auth/callback?token=${token}`);
   }
 );
 
