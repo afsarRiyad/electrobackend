@@ -648,6 +648,10 @@ router.get("/google", passport.authenticate("google", { scope: ["profile", "emai
 
 router.get(
   "/google/callback",
+  (req, res, next) => {
+    console.log("Google callback received:", req.query);
+    next();
+  },
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
   (req, res) => {
     const token = oauthGenerateToken(req.user._id);
