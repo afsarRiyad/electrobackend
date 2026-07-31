@@ -65,8 +65,8 @@ if (isDevelopment) {
 const allowedOrigins = [
   process.env.ADMIN_URL, // Only the real dashboard domain
   process.env.CLIENT_URL, // Client frontend domain
+  "https://tech-mart-six.vercel.app", // Vercel frontend
 ].filter(Boolean);
-
 // Allow localhost for testing (can be disabled by setting ALLOW_LOCALHOST=false)
 const allowLocalhost = process.env.ALLOW_LOCALHOST !== "false";
 
