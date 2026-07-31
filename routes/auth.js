@@ -251,7 +251,27 @@ router.post("/login", validateLogin, async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 router.get("/me", protect, async (req, res) => {
-  return res.json({ data: req.user });
+  // Return only safe user data, exclude sensitive fields
+  const safeUserData = {
+    _id: req.user._id,
+    username: req.user.username,
+    email: req.user.email,
+    firstName: req.user.firstName,
+    lastName: req.user.lastName,
+    role: req.user.role,
+    status: req.user.status,
+    avatar: req.user.avatar,
+    isVerified: req.user.isVerified,
+    emailVerifiedAt: req.user.emailVerifiedAt,
+    phone: req.user.phone,
+    companyName: req.user.companyName,
+    billingAddress: req.user.billingAddress,
+    shippingAddress: req.user.shippingAddress,
+    createdAt: req.user.createdAt,
+    updatedAt: req.user.updatedAt,
+  };
+  
+  return res.json({ data: safeUserData });
 });
 
 // @desc    Logout user
@@ -539,6 +559,46 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
+// @desc    Resend OTP (authenticated)
+// @route   POST /api/auth/resend-otp
+// @access  Private
+router.post("/resend-otp", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+    const otpExpires = generateOTPExpiry();
+
+    // Update user with new OTP
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    // Send OTP email (non-blocking)
+    sendOTPEmail(user.email, otp, user.username).catch(err => {
+      console.error("Failed to send OTP email:", err);
+    });
+
+    res.json({
+      success: true,
+      error: false,
+      message: "OTP sent successfully"
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ message: "Server error during OTP resend" });
+  }
+});
+
 // @desc    Verify email with OTP (authenticated - only requires OTP)
 // @route   POST /api/auth/verify-otp/me
 // @access  Private
@@ -580,41 +640,6 @@ router.post("/verify-otp/me", protect, async (req, res) => {
   } catch (error) {
     console.error("OTP verification error:", error);
     res.status(500).json({ message: "Server error during OTP verification" });
-  }
-});
-
-// @desc    Resend OTP
-// @route   POST /api/auth/resend-otp
-// @access  Private
-router.post("/resend-otp", protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({ message: "Email already verified" });
-    }
-
-    const otp = generateOTP();
-    const otpExpires = generateOTPExpiry();
-
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
-
-    await sendOTPEmail(user.email, otp, user.username);
-
-    res.json({
-      success: true,
-      error: false,
-      message: "OTP sent successfully"
-    });
-  } catch (error) {
-    console.error("Resend OTP error:", error);
-    res.status(500).json({ message: "Server error during resend OTP" });
   }
 });
 
