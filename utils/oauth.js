@@ -39,6 +39,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
           if (user) {
             // Link Google account to existing user
+            if (!user.oauthProviders) user.oauthProviders = {};
             user.oauthProviders.google = {
               id: profile.id,
               email: email,
@@ -144,6 +145,7 @@ if (
 
           if (user) {
             // Link Apple account to existing user
+            if (!user.oauthProviders) user.oauthProviders = {};
             user.oauthProviders.apple = {
               id: appleId,
               email: email,
@@ -202,5 +204,6 @@ passport.deserializeUser(async (id, done) => {
     done(error);
   }
 });
+console.log(process.env.GOOGLE_CALLBACK_URL);
 
 export { passport, generateToken };
