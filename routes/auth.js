@@ -651,14 +651,25 @@ router.get(
   (req, res, next) => {
     console.log("Google callback received:", req.query);
     console.log("CLIENT_URL:", process.env.CLIENT_URL);
+    console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
     next();
   },
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
   (req, res) => {
-    const token = oauthGenerateToken(req.user._id);
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
-    console.log("Redirecting to:", `${clientUrl}/auth/callback?token=${token}`);
-    res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+    try {
+      console.log("User authenticated:", req.user._id);
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET is not configured");
+      }
+      const token = oauthGenerateToken(req.user._id);
+      const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+      console.log("Token generated successfully");
+      console.log("Redirecting to:", `${clientUrl}/auth/callback?token=${token}`);
+      res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+    } catch (error) {
+      console.error("Error in OAuth callback:", error);
+      res.status(500).json({ message: "OAuth callback error", error: error.message });
+    }
   }
 );
 
