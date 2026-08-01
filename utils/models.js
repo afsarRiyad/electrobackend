@@ -154,6 +154,25 @@ const compareSchema = new mongoose.Schema(
 );
 compareSchema.index({ user: 1, product: 1 }, { unique: true });
 
+// ─── CART ────────────────────────────────────────────────────────────────────
+const cartItemSchema = new mongoose.Schema(
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    quantity: { type: Number, required: true, min: 1, default: 1 },
+    variant: { type: mongoose.Schema.Types.ObjectId, ref: "ProductVariant", default: null },
+  },
+  { _id: false }
+);
+
+const cartSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    items: { type: [cartItemSchema], default: [] },
+  },
+  { timestamps: true }
+);
+cartSchema.index({ user: 1 });
+
 // ─── CUSTOMER ─────────────────────────────────────────────────────────────────
 const customerSchema = new mongoose.Schema(
   {
@@ -392,6 +411,7 @@ export const User = mongoose.model("User", userSchema);
 export const Product = mongoose.model("Product", productSchema);
 export const Wishlist = mongoose.model("Wishlist", wishlistSchema);
 export const Compare = mongoose.model("Compare", compareSchema);
+export const Cart = mongoose.model("Cart", cartSchema);
 export const Customer = mongoose.model("Customer", customerSchema);
 export const Order = mongoose.model("Order", orderSchema);
 export const Inventory = mongoose.model("Inventory", inventorySchema);

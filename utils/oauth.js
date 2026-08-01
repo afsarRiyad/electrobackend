@@ -83,9 +83,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       }
     )
   );
-  console.log("✅ Google OAuth configured");
 } else {
-  console.log("⚠️  Google OAuth not configured (missing credentials)");
+  // Google OAuth not configured
 }
 
 // Apple OAuth Strategy (only if credentials are configured)
@@ -185,9 +184,8 @@ if (
       }
     )
   );
-  console.log("✅ Apple OAuth configured");
 } else {
-  console.log("⚠️  Apple OAuth not configured (missing credentials)");
+  // Apple OAuth not configured
 }
 
 // Serialize user for session
@@ -204,6 +202,5 @@ passport.deserializeUser(async (id, done) => {
     done(error);
   }
 });
-console.log(process.env.GOOGLE_CALLBACK_URL);
 
 export { passport, generateToken };
