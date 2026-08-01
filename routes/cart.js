@@ -58,6 +58,22 @@ const validateItemId = (itemId, res) => {
   return false;
 };
 
+// Prefer the cart item ID. The product-ID fallback keeps carts created before
+// embedded item IDs were enabled removable (one matching product at a time).
+const findCartItem = (items, identifier) => {
+  const itemIndex = items.findIndex(
+    (item) => item._id?.toString() === identifier
+  );
+  if (itemIndex >= 0) return { item: items[itemIndex], itemIndex };
+
+  const productIndex = items.findIndex(
+    (item) => item.product?.toString() === identifier
+  );
+  if (productIndex >= 0) return { item: items[productIndex], itemIndex: productIndex };
+
+  return { item: null, itemIndex: -1 };
+};
+
 const getVariant = async (variantId, productId) => {
   if (!variantId) return null;
 
@@ -174,7 +190,7 @@ router.put("/:itemId", protect, async (req, res) => {
 
     cart = await ensureCartItemIds(cart);
 
-    const item = cart.items.id(req.params.itemId);
+    const { item } = findCartItem(cart.items, req.params.itemId);
     if (!item) {
       return res.status(404).json({ message: "Item not found in cart" });
     }
@@ -220,12 +236,12 @@ router.delete("/:itemId", protect, async (req, res) => {
 
     cart = await ensureCartItemIds(cart);
 
-    const item = cart.items.id(req.params.itemId);
+    const { item, itemIndex } = findCartItem(cart.items, req.params.itemId);
     if (!item) {
       return res.status(404).json({ message: "Item not found in cart" });
     }
 
-    item.deleteOne();
+    cart.items.splice(itemIndex, 1);
     await cart.save();
     return res.json({
       message: "Item removed from cart",
