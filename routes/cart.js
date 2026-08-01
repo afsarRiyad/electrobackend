@@ -39,7 +39,7 @@ router.get("/", protect, async (req, res) => {
 });
 
 // ─── POST /api/cart ────────────────────────────────────────────────────
-// Add item to cart
+// Add item to cart with flexible quantity
 router.post("/", protect, async (req, res) => {
   try {
     const { product, quantity = 1, variant } = req.body;
@@ -60,7 +60,7 @@ router.post("/", protect, async (req, res) => {
 
     if (productDoc.stock < quantity) {
       return res.status(400).json({
-        message: `Insufficient stock. Available: ${productDoc.stock}, Requested: ${quantity}`
+        message: `Out of stock. Available: ${productDoc.stock}, Requested: ${quantity}`
       });
     }
 
@@ -81,7 +81,7 @@ router.post("/", protect, async (req, res) => {
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
       if (productDoc.stock < newQuantity) {
         return res.status(400).json({
-          message: `Insufficient stock. Available: ${productDoc.stock}, Requested: ${newQuantity}`
+          message: `Out of stock. Available: ${productDoc.stock}, Requested: ${newQuantity}`
         });
       }
       cart.items[existingItemIndex].quantity = newQuantity;
