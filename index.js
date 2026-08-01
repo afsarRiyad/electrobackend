@@ -301,7 +301,7 @@ app.use("/api", generalLimiter, productCache, productRoutes);
 app.use("/api/auth", authLimiter, noCache, authRoutes);
 app.use("/api", generalLimiter, noCache, wishlistRoutes);
 app.use("/api", generalLimiter, noCache, compareRoutes);
-app.use("/api", generalLimiter, noCache, cartRoutes);
+app.use("/api/cart", generalLimiter, noCache, cartRoutes);
 app.use("/api/orders", generalLimiter, noCache, orderRoutes);
 app.use("/api/user", generalLimiter, noCache, userRoutes);
 app.use("/api/upload", uploadLimiter, noCache, uploadRoutes);
