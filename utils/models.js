@@ -242,6 +242,8 @@ const orderSchema = new mongoose.Schema(
     items: { type: [orderItemSchema], default: [] },
     subtotal: { type: Number, required: true },
     discount: { type: Number, default: 0 },
+    couponCode: { type: String, default: null },
+    coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
     tax: { type: Number, default: 0 },
     shippingCost: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
@@ -736,6 +738,7 @@ const couponRedemptionSchema = new mongoose.Schema(
     },
     ipAddress: { type: String, required: true },
     userAgent: { type: String, default: null },
+    order: { type: mongoose.Schema.Types.ObjectId, ref: "Order", default: null },
   },
   { timestamps: true }
 );

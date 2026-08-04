@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Order, Product, Customer } from "../utils/models.js";
+import { Coupon, CouponRedemption, Order, Product, Customer } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { requireVerification } from "../utils/verificationMiddleware.js";
 import { exportOrdersToCSV } from "../utils/export.js";
@@ -122,12 +122,17 @@ router.get("/:id", protect, async (req, res) => {
 // ─── POST /api/orders ─────────────────────────────────────────────────
 // Create new order
 router.post("/", protect, requireVerification, activityMiddleware('create', 'order'), async (req, res) => {
+  let couponReservation = null;
+  let couponRedemption = null;
+  let orderCreated = false;
+
   try {
     const {
       items = [],
       shippingAddress,
       paymentMethod = "cash_on_delivery",
       notes,
+      couponCode,
     } = req.body;
 
     if (!items || items.length === 0) {
@@ -186,8 +191,82 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       });
     }
 
+    // A coupon is redeemed only while an order is being created, never when a
+    // customer merely previews it in the cart.
+    let discount = 0;
+    let appliedCoupon = null;
+    if (couponCode) {
+      const now = new Date();
+      const normalizedCode = String(couponCode).trim().toUpperCase();
+      const coupon = await Coupon.findOne({
+        code: normalizedCode,
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+      });
+
+      if (!coupon) {
+        return res.status(400).json({ message: "Coupon is invalid, inactive, or expired" });
+      }
+      if (subtotal < coupon.minimumOrderAmount) {
+        return res.status(400).json({ message: `Minimum order amount of $${coupon.minimumOrderAmount} required` });
+      }
+
+      const reservedCoupon = await Coupon.findOneAndUpdate(
+        {
+          _id: coupon._id,
+          isActive: true,
+          validFrom: { $lte: now },
+          validUntil: { $gte: now },
+          $expr: {
+            $or: [
+              { $eq: ["$usageLimit", null] },
+              { $lt: ["$usageCount", "$usageLimit"] },
+            ],
+          },
+        },
+        { $inc: { usageCount: 1 } },
+        { new: true }
+      );
+
+      if (!reservedCoupon) {
+        return res.status(400).json({ message: "Coupon usage limit exceeded" });
+      }
+      couponReservation = reservedCoupon;
+
+      try {
+        couponRedemption = await CouponRedemption.create({
+          coupon: reservedCoupon._id,
+          user: req.user._id,
+          ipAddress: req.ip,
+          userAgent: req.get("user-agent"),
+        });
+      } catch (error) {
+        await Coupon.updateOne({ _id: reservedCoupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
+        couponReservation = null;
+
+        if (error?.code === 11000) {
+          const duplicateFields = Object.keys(error.keyPattern || {});
+          return res.status(409).json({
+            message: duplicateFields.includes("ipAddress")
+              ? "This coupon has already been redeemed from this IP address"
+              : "You have already redeemed this coupon",
+          });
+        }
+        throw error;
+      }
+
+      discount = reservedCoupon.discountType === "percentage"
+        ? (subtotal * reservedCoupon.discountValue) / 100
+        : reservedCoupon.discountValue;
+      if (reservedCoupon.maximumDiscountAmount && discount > reservedCoupon.maximumDiscountAmount) {
+        discount = reservedCoupon.maximumDiscountAmount;
+      }
+      discount = Math.min(discount, subtotal);
+      appliedCoupon = reservedCoupon;
+    }
+
     // Calculate totals
-    const discount = 0; // Can be enhanced with coupon logic
     const tax = subtotal * 0.15; // 15% tax
     const shippingCost = paymentMethod === "cash_on_delivery" ? 50 : 0;
     const totalAmount = subtotal - discount + tax + shippingCost;
@@ -212,6 +291,8 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       items: validatedItems,
       subtotal,
       discount,
+      couponCode: appliedCoupon?.code || null,
+      coupon: appliedCoupon?._id || null,
       tax,
       shippingCost,
       totalAmount,
@@ -222,6 +303,12 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       shippingAddress,
       notes,
     });
+    orderCreated = true;
+
+    if (couponRedemption) {
+      couponRedemption.order = order._id;
+      await couponRedemption.save();
+    }
 
     // Update product stock using bulk operation
     const stockUpdates = validatedItems.map(item => ({
@@ -242,6 +329,15 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
 
     return res.status(201).json({ message: "Order created successfully", data: order });
   } catch (err) {
+    // If order creation failed after reserving a coupon, return that use to the
+    // customer. Once an order exists, its coupon remains tied to the order.
+    if (couponReservation && !orderCreated) {
+      await CouponRedemption.deleteOne({ _id: couponRedemption?._id }).catch(() => {});
+      await Coupon.updateOne(
+        { _id: couponReservation._id, usageCount: { $gt: 0 } },
+        { $inc: { usageCount: -1 } }
+      ).catch(() => {});
+    }
     console.error("Create order error:", err);
     return res.status(500).json({ message: "Server error" });
   }
