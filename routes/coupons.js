@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Coupon } from "../utils/models.js";
+import { Coupon, CouponRedemption } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 
 const router = Router();
@@ -83,36 +83,76 @@ router.post("/apply", protect, async (req, res) => {
   try {
     const { code, orderTotal } = req.body;
     const userId = req.user._id;
+    const userIP = req.ip;
+
+    if (!req.user.isVerified) {
+      return res.status(403).json({ message: "Verify your email before using a coupon" });
+    }
 
     if (!code) {
       return res.status(400).json({ message: "Coupon code is required" });
     }
 
-    const coupon = await Coupon.findOne({ 
-      code: code.toUpperCase(),
-      isActive: true 
-    });
-
-    if (!coupon) {
-      return res.status(404).json({ message: "Invalid coupon code" });
+    if (!Number.isFinite(orderTotal) || orderTotal <= 0) {
+      return res.status(400).json({ message: "A valid order total is required" });
     }
 
-    // Check if coupon is within valid date range
     const now = new Date();
-    if (now < coupon.validFrom || now > coupon.validUntil) {
-      return res.status(400).json({ message: "Coupon has expired or is not yet valid" });
+
+    // Reserve one global use with a conditional update. This avoids the
+    // read-modify-write race that could exceed usageLimit under concurrent requests.
+    const coupon = await Coupon.findOneAndUpdate(
+      {
+        code: code.toUpperCase(),
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+        $expr: {
+          $or: [
+            { $eq: ["$usageLimit", null] },
+            { $lt: ["$usageCount", "$usageLimit"] },
+          ],
+        },
+      },
+      { $inc: { usageCount: 1 } },
+      { new: true }
+    );
+
+    if (!coupon) {
+      return res.status(400).json({ message: "Coupon is invalid, inactive, expired, or has reached its usage limit" });
     }
 
     // Check minimum order amount
-    if (orderTotal && orderTotal < coupon.minimumOrderAmount) {
+    if (orderTotal < coupon.minimumOrderAmount) {
+      await Coupon.updateOne({ _id: coupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
       return res.status(400).json({ 
         message: `Minimum order amount of $${coupon.minimumOrderAmount} required` 
       });
     }
 
-    // Check usage limit
-    if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
-      return res.status(400).json({ message: "Coupon usage limit exceeded" });
+    try {
+      await CouponRedemption.create({
+        coupon: coupon._id,
+        user: userId,
+        ipAddress: userIP,
+        userAgent: req.get("user-agent"),
+      });
+    } catch (error) {
+      // The global use was reserved above, so release it if the database's
+      // unique index rejects a repeated user or repeated IP redemption.
+      await Coupon.updateOne({ _id: coupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
+
+      if (error?.code === 11000) {
+        const duplicateFields = Object.keys(error.keyPattern || {});
+        const isIPDuplicate = duplicateFields.includes("ipAddress");
+        return res.status(409).json({
+          message: isIPDuplicate
+            ? "This coupon has already been redeemed from this IP address"
+            : "You have already redeemed this coupon",
+        });
+      }
+
+      throw error;
     }
 
     // Calculate discount
@@ -132,10 +172,6 @@ router.post("/apply", protect, async (req, res) => {
     if (discountAmount > orderTotal) {
       discountAmount = orderTotal;
     }
-
-    // Increment usage count
-    coupon.usageCount += 1;
-    await coupon.save();
 
     res.json({
       success: true,

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { Router } from "express";
-import { User } from "../utils/models.js";
+import { Coupon, SignupIPRateLimit, User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { sendPasswordResetEmail, sendOTPEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
@@ -58,10 +58,99 @@ const validateUsername = (username) => {
   return { valid: true };
 };
 
+const SIGNUP_IP_WINDOW_MS = 24 * 60 * 60 * 1000;
+const SIGNUP_IP_MAX_ACCOUNTS = 3;
+
+const reserveSignupIP = async (ipAddress) => {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - SIGNUP_IP_WINDOW_MS);
+  const expiresAt = new Date(now.getTime() + SIGNUP_IP_WINDOW_MS);
+  const reservationId = crypto.randomUUID();
+  const recentEvents = {
+    $filter: {
+      input: { $ifNull: ["$signupEvents", []] },
+      as: "event",
+      cond: { $gte: ["$$event.createdAt", windowStart] },
+    },
+  };
+  const filter = {
+    ipAddress,
+    $expr: { $lt: [{ $size: recentEvents }, SIGNUP_IP_MAX_ACCOUNTS] },
+  };
+  const update = [
+    {
+      $set: {
+        signupEvents: {
+          $concatArrays: [recentEvents, [{ reservationId, createdAt: now }]],
+        },
+        expiresAt,
+      },
+    },
+  ];
+
+  // An existing document is updated atomically. If it does not exist, a
+  // concurrent first signup can race only on the unique ipAddress index; retry
+  // once so the loser evaluates the newly-created ledger document.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const reservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
+      new: true,
+    });
+    if (reservation) return reservationId;
+
+    if (await SignupIPRateLimit.exists({ ipAddress })) return null;
+
+    try {
+      const createdReservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
+        new: true,
+        upsert: true,
+      });
+      if (createdReservation) return reservationId;
+    } catch (error) {
+      if (error?.code !== 11000 || attempt === 1) throw error;
+    }
+  }
+
+  return null;
+};
+
+const releaseSignupIPReservation = (ipAddress, reservationId) =>
+  SignupIPRateLimit.updateOne(
+    { ipAddress },
+    { $pull: { signupEvents: { reservationId } } }
+  );
+
+const getWelcomeOffer = async () => {
+  const code = process.env.WELCOME_COUPON_CODE?.trim().toUpperCase();
+  if (!code) return null;
+
+  const now = new Date();
+  const coupon = await Coupon.findOne({
+    code,
+    isActive: true,
+    validFrom: { $lte: now },
+    validUntil: { $gte: now },
+  }).lean();
+
+  if (!coupon) return null;
+
+  return {
+    code: coupon.code,
+    description: coupon.description,
+    discountType: coupon.discountType,
+    discountValue: coupon.discountValue,
+    maximumDiscountAmount: coupon.maximumDiscountAmount,
+    minimumOrderAmount: coupon.minimumOrderAmount,
+    validUntil: coupon.validUntil,
+  };
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 // @access  Public
 router.post("/signup", validateSignup, async (req, res) => {
+  let signupReservationId = null;
+  let signupIP = null;
+
   try {
     const { username, email, password } = req.body || {};
 
@@ -98,6 +187,15 @@ router.post("/signup", validateSignup, async (req, res) => {
       return res.status(400).json({ message: "User already exists with this email or username" });
     }
 
+    // Reserve an IP slot atomically before doing the expensive password hash.
+    signupIP = req.ip;
+    signupReservationId = await reserveSignupIP(signupIP);
+    if (!signupReservationId) {
+      return res.status(429).json({
+        message: "Too many accounts created from this IP address. Please try again later.",
+      });
+    }
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -113,7 +211,14 @@ router.post("/signup", validateSignup, async (req, res) => {
       password: hashedPassword,
       otp,
       otpExpires,
+      signupIPs: [{
+        ipAddress: signupIP,
+        userAgent: req.get("user-agent"),
+        createdAt: new Date(),
+      }],
     });
+    // The account now exists, so its IP reservation must remain in the window.
+    signupReservationId = null;
 
     // Send OTP email (non-blocking - don't await)
     sendOTPEmail(user.email, otp, user.username).catch(err => {
@@ -164,6 +269,11 @@ router.post("/signup", validateSignup, async (req, res) => {
       });
     }
   } catch (error) {
+    if (signupReservationId && signupIP) {
+      await releaseSignupIPReservation(signupIP, signupReservationId).catch((releaseError) => {
+        console.error("Failed to release signup IP reservation:", releaseError);
+      });
+    }
     console.error("Signup error:", error);
     return res.status(500).json({ message: "Server error during registration" });
   }
@@ -548,10 +658,16 @@ router.post("/verify-otp", async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
+    const welcomeOffer = await getWelcomeOffer().catch((error) => {
+      console.error("Failed to load welcome offer:", error);
+      return null;
+    });
+
     res.json({
       success: true,
       error: false,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
+      data: { welcomeOffer },
     });
   } catch (error) {
     console.error("OTP verification error:", error);
@@ -632,10 +748,16 @@ router.post("/verify-otp/me", protect, async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
+    const welcomeOffer = await getWelcomeOffer().catch((error) => {
+      console.error("Failed to load welcome offer:", error);
+      return null;
+    });
+
     res.json({
       success: true,
       error: false,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
+      data: { welcomeOffer },
     });
   } catch (error) {
     console.error("OTP verification error:", error);

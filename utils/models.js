@@ -34,6 +34,12 @@ const userSchema = new mongoose.Schema(
       userAgent: { type: String },
       ipAddress: { type: String },
     }],
+    // IP tracking for fraud prevention
+    signupIPs: [{
+      ipAddress: { type: String },
+      createdAt: { type: Date, default: Date.now },
+      userAgent: { type: String },
+    }],
     // OAuth providers
     oauthProviders: {
       google: {
@@ -81,6 +87,23 @@ userSchema.index({ email: 1 });
 userSchema.index({ username: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ role: 1 });
+// Supports the rolling signup-IP fraud check. Both fields belong to the same
+// embedded signupIPs entry, so queries should use $elemMatch.
+userSchema.index({ "signupIPs.ipAddress": 1, "signupIPs.createdAt": -1 });
+
+// A single document per IP lets signup limiting be reserved atomically rather
+// than relying on a count followed by a separate user insert.
+const signupIPRateLimitSchema = new mongoose.Schema({
+  ipAddress: { type: String, required: true, unique: true },
+  signupEvents: [{
+    reservationId: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+  }],
+  // MongoDB's TTL monitor removes inactive IP records after the 24-hour window.
+  expiresAt: { type: Date, required: true },
+});
+
+signupIPRateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // ─── PRODUCT ─────────────────────────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
@@ -696,7 +719,33 @@ couponSchema.index({ code: 1 });
 couponSchema.index({ validFrom: 1, validUntil: 1 });
 couponSchema.index({ isActive: 1 });
 
+// A redemption is deliberately kept separate from the coupon document. The
+// compound unique indexes let MongoDB, rather than a read-then-write check,
+// enforce one redemption per user and per IP address for each coupon.
+const couponRedemptionSchema = new mongoose.Schema(
+  {
+    coupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      required: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    ipAddress: { type: String, required: true },
+    userAgent: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+
+couponRedemptionSchema.index({ coupon: 1, user: 1 }, { unique: true });
+couponRedemptionSchema.index({ coupon: 1, ipAddress: 1 }, { unique: true });
+
 export const Message = mongoose.model("Message", messageSchema);
 export const ReturnRequest = mongoose.model("ReturnRequest", returnRequestSchema);
 export const RefundRequest = mongoose.model("RefundRequest", refundRequestSchema);
 export const Coupon = mongoose.model("Coupon", couponSchema);
+export const CouponRedemption = mongoose.model("CouponRedemption", couponRedemptionSchema);
+export const SignupIPRateLimit = mongoose.model("SignupIPRateLimit", signupIPRateLimitSchema);
