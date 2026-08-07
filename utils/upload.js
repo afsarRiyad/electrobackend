@@ -96,6 +96,25 @@ export const uploadMultiple = async (req, res, next) => {
   });
 };
 
+// Avatar upload middleware with Cloudinary upload (for user profile images)
+export const uploadAvatar = async (req, res, next) => {
+  upload.single("image")(req, res, async (err) => {
+    if (err) return next(err);
+    
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file.buffer, "techmart/avatars");
+        req.file.cloudinaryResult = result;
+        req.file.path = result.secure_url;
+        req.file.filename = result.public_id;
+      } catch (error) {
+        return next(error);
+      }
+    }
+    next();
+  });
+};
+
 // Delete image from Cloudinary
 export const deleteImage = async (publicId) => {
   try {

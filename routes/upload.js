@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { protect } from "../utils/authMiddleware.js";
 import { isAdmin } from "../utils/adminMiddleware.js";
-import { uploadSingle, uploadMultiple, deleteImage, getPublicIdFromUrl } from "../utils/upload.js";
-import { v2 as cloudinary } from "cloudinary";
+import { uploadSingle, uploadMultiple, uploadAvatar, deleteImage, getPublicIdFromUrl } from "../utils/upload.js";
 
 const router = Router();
 
@@ -110,30 +109,17 @@ router.post("/delete-by-url", protect, isAdmin, async (req, res) => {
 
 // ─── POST /api/upload/user/single ───────────────────────────────────────────────
 // Upload single image for authenticated users (profile, etc.)
-router.post("/user/single", protect, uploadSingle, async (req, res) => {
+router.post("/user/single", protect, uploadAvatar, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // Re-upload to avatar folder with different transformation
-    const { uploadToCloudinary } = await import("../utils/upload.js");
-    const result = await uploadToCloudinary(req.file.buffer, "techmart/avatars");
-    
-    // Delete the original upload from products folder
-    if (req.file.filename) {
-      try {
-        await cloudinary.uploader.destroy(req.file.filename);
-      } catch (err) {
-        console.error("Error deleting original upload:", err);
-      }
-    }
-
     return res.status(201).json({
       message: "Image uploaded successfully",
       data: {
-        url: result.secure_url,
-        publicId: result.public_id,
+        url: req.file.path,
+        publicId: req.file.filename,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
@@ -168,29 +154,6 @@ router.post("/user/multiple", protect, uploadMultiple, async (req, res) => {
   } catch (err) {
     console.error("User multiple upload error:", err);
     return res.status(500).json({ message: "Server error during upload" });
-  }
-});
-
-// ─── DELETE /api/upload/user/:publicId ────────────────────────────────────────────
-// Delete user's own image
-router.delete("/user/:publicId", protect, async (req, res) => {
-  try {
-    const { publicId } = req.params;
-    
-    if (!publicId) {
-      return res.status(400).json({ message: "Public ID is required" });
-    }
-
-    const result = await deleteImage(publicId);
-
-    if (result.success) {
-      return res.json({ message: "Image deleted successfully" });
-    } else {
-      return res.status(500).json({ message: result.error || "Failed to delete image" });
-    }
-  } catch (err) {
-    console.error("User delete image error:", err);
-    return res.status(500).json({ message: "Server error during deletion" });
   }
 });
 
