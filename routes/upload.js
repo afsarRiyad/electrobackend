@@ -2,6 +2,7 @@ import { Router } from "express";
 import { protect } from "../utils/authMiddleware.js";
 import { isAdmin } from "../utils/adminMiddleware.js";
 import { uploadSingle, uploadMultiple, deleteImage, getPublicIdFromUrl } from "../utils/upload.js";
+import { v2 as cloudinary } from "cloudinary";
 
 const router = Router();
 
@@ -115,11 +116,24 @@ router.post("/user/single", protect, uploadSingle, async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    // Re-upload to avatar folder with different transformation
+    const { uploadToCloudinary } = await import("../utils/upload.js");
+    const result = await uploadToCloudinary(req.file.buffer, "techmart/avatars");
+    
+    // Delete the original upload from products folder
+    if (req.file.filename) {
+      try {
+        await cloudinary.uploader.destroy(req.file.filename);
+      } catch (err) {
+        console.error("Error deleting original upload:", err);
+      }
+    }
+
     return res.status(201).json({
       message: "Image uploaded successfully",
       data: {
-        url: req.file.path,
-        publicId: req.file.filename,
+        url: result.secure_url,
+        publicId: result.public_id,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,

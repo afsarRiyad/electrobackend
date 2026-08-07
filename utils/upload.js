@@ -39,6 +39,9 @@ const uploadToCloudinary = (buffer, folder = "techmart/products") => {
       { 
         folder: folder,
         allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+        transformation: [
+          { width: 500, height: 500, crop: "fill", quality: "auto" }
+        ]
       },
       (error, result) => {
         if (error) reject(error);

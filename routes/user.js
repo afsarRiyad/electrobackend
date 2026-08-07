@@ -4,6 +4,13 @@ import { protect } from "../utils/authMiddleware.js";
 import { validateMessage } from "../utils/validation.js";
 import { v2 as cloudinary } from "cloudinary";
 
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const router = Router();
 
 // ─── GET /api/user/profile ──────────────────────────────────────────────────
@@ -221,6 +228,7 @@ router.put("/profile", protect, async (req, res) => {
       "companyName",
       "phone",
       "avatar",
+      "avatarPublicId",
       "billingAddress",
       "shippingAddress",
     ];
