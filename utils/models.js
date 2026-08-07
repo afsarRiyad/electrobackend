@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     avatar: { type: String, default: null },
+    avatarPublicId: { type: String, default: null },
     firstName: { type: String, default: null },
     lastName: { type: String, default: null },
     companyName: { type: String, default: null },

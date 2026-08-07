@@ -2,6 +2,7 @@ import { Router } from "express";
 import { User, Order, Product, Message, Download, PaymentMethod } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
 import { validateMessage } from "../utils/validation.js";
+import { v2 as cloudinary } from "cloudinary";
 
 const router = Router();
 
@@ -570,6 +571,30 @@ router.post("/contact", protect, validateMessage, async (req, res) => {
     });
   } catch (err) {
     console.error("Send contact message error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ─── DELETE /api/user/avatar ─────────────────────────────────────────────────────
+// Delete user's avatar
+router.delete("/avatar", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.avatarPublicId) {
+      await cloudinary.uploader.destroy(user.avatarPublicId);
+    }
+
+    user.avatar = null;
+    user.avatarPublicId = null;
+    await user.save();
+
+    return res.json({ message: "Avatar deleted successfully" });
+  } catch (err) {
+    console.error("Delete avatar error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
