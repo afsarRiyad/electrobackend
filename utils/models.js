@@ -283,7 +283,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 // Auto-generate order number before saving using atomic counter
-orderSchema.pre("save", async function (next) {
+orderSchema.pre("save", async function () {
   if (!this.orderNumber) {
     const Counter = mongoose.model("Counter");
     const counter = await Counter.findOneAndUpdate(
@@ -293,25 +293,23 @@ orderSchema.pre("save", async function (next) {
     );
     this.orderNumber = `ORD-${String(counter.seq).padStart(6, "0")}`;
   }
-  next();
 });
 
 // Track status changes
-orderSchema.pre("save", function (next) {
+orderSchema.pre("save", function () {
   if (this.isModified("status")) {
     const statusHistoryEntry = {
       status: this.status,
       changedAt: new Date(),
       note: this.notes || null,
     };
-    
+
     if (!this.statusHistory) {
       this.statusHistory = [];
     }
-    
+
     this.statusHistory.push(statusHistoryEntry);
   }
-  next();
 });
 
 orderSchema.index({ status: 1 });
