@@ -95,6 +95,7 @@ const reserveSignupIP = async (ipAddress) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const reservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
       new: true,
+      updatePipeline: true,
     });
     if (reservation) return reservationId;
 
@@ -104,6 +105,7 @@ const reserveSignupIP = async (ipAddress) => {
       const createdReservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
         new: true,
         upsert: true,
+        updatePipeline: true,
       });
       if (createdReservation) return reservationId;
     } catch (error) {
@@ -172,6 +174,7 @@ router.post("/signup", validateSignup, async (req, res) => {
   let signupIP = null;
 
   try {
+    console.log('Signup request received:', req.body);
     const { username, email, password } = req.body || {};
 
     if (!username || !email || !password) {
@@ -295,7 +298,13 @@ router.post("/signup", validateSignup, async (req, res) => {
       });
     }
     console.error("Signup error:", error);
-    return res.status(500).json({ message: "Server error during registration" });
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    });
+    return res.status(500).json({ message: error.message || "Server error during registration" });
   }
 });
 
@@ -678,16 +687,25 @@ router.post("/verify-otp", async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
+    console.log('User verified:', user.email, 'Username:', user.username);
+
     const welcomeOffer = await getWelcomeOffer(user.email).catch((error) => {
       console.error("Failed to load welcome offer:", error);
       return null;
     });
 
+    console.log('Welcome offer generated:', welcomeOffer);
+
     // Send welcome email with coupon code
     if (welcomeOffer && welcomeOffer.code) {
-      await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
+      console.log('Sending welcome email to:', user.email, 'with coupon:', welcomeOffer.code);
+      const emailSent = await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
         console.error("Failed to send welcome email:", error);
+        return false;
       });
+      console.log('Welcome email sent result:', emailSent);
+    } else {
+      console.log('No welcome offer available, skipping email');
     }
 
     res.json({
@@ -775,16 +793,25 @@ router.post("/verify-otp/me", protect, async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
+    console.log('User verified (authenticated):', user.email, 'Username:', user.username);
+
     const welcomeOffer = await getWelcomeOffer(user.email).catch((error) => {
       console.error("Failed to load welcome offer:", error);
       return null;
     });
 
+    console.log('Welcome offer generated (authenticated):', welcomeOffer);
+
     // Send welcome email with coupon code
     if (welcomeOffer && welcomeOffer.code) {
-      await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
+      console.log('Sending welcome email to:', user.email, 'with coupon:', welcomeOffer.code);
+      const emailSent = await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
         console.error("Failed to send welcome email:", error);
+        return false;
       });
+      console.log('Welcome email sent result (authenticated):', emailSent);
+    } else {
+      console.log('No welcome offer available, skipping email (authenticated)');
     }
 
     res.json({
