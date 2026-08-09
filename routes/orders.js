@@ -17,9 +17,10 @@ import {
 const router = Router();
 
 // ─── GET /api/orders/track/:orderNumber ─────────────────────────────────────
-// Public order tracking by order number
+// Public order tracking by order number (optionally with email for verification)
 router.get("/track/:orderNumber", asyncHandler(async (req, res) => {
   const { orderNumber } = req.params;
+  const { email } = req.query;
 
   if (!orderNumber) {
     throw new ValidationError("Order number is required");
@@ -31,6 +32,13 @@ router.get("/track/:orderNumber", asyncHandler(async (req, res) => {
 
   if (!order) {
     throw new NotFoundError("Order not found");
+  }
+
+  // If email is provided, verify it matches the order
+  if (email) {
+    if (order.customerEmail !== email.toLowerCase()) {
+      throw new ValidationError("Email does not match this order");
+    }
   }
 
   // Return limited info for public tracking
@@ -50,6 +58,8 @@ router.get("/track/:orderNumber", asyncHandler(async (req, res) => {
         totalPrice: item.totalPrice,
       })),
       shippingAddress: order.shippingAddress,
+      // Include email verification status
+      emailVerified: email ? true : false,
     },
   });
 }));
@@ -522,5 +532,136 @@ router.get("/stats/summary", protect, asyncHandler(async (req, res) => {
 
   return res.json({ data: summary });
 }));
+
+// ─── POST /api/orders/calculate ───────────────────────────────────────────────
+// Calculate order totals for preview (doesn't create order)
+router.post("/calculate", protect, async (req, res) => {
+  try {
+    const { items = [], shippingAddress, couponCode } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ message: "Order items are required" });
+    }
+
+    // Parse shippingAddress if it's a string
+    let parsedShippingAddress = shippingAddress;
+    if (typeof shippingAddress === 'string') {
+      try {
+        parsedShippingAddress = JSON.parse(shippingAddress);
+      } catch (e) {
+        console.error('Failed to parse shippingAddress string:', e);
+      }
+    }
+
+    // Get product details and calculate totals
+    const productIds = items.map(item => item.product);
+    const products = await Product.find({ _id: { $in: productIds } }).lean();
+    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
+    let subtotal = 0;
+    const validatedItems = [];
+
+    for (const item of items) {
+      const product = productMap.get(item.product);
+      if (!product) {
+        return res.status(404).json({ message: `Product ${item.product} not found` });
+      }
+
+      if (product.stock < item.quantity) {
+        return res.status(400).json({ 
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+        });
+      }
+
+      const unitPrice = product.salePrice || product.price;
+      const totalPrice = unitPrice * item.quantity;
+      subtotal += totalPrice;
+
+      validatedItems.push({
+        product: product._id,
+        productName: product.name,
+        productSku: product.sku,
+        quantity: item.quantity,
+        unitPrice,
+        totalPrice,
+      });
+    }
+
+    // Calculate discount from coupon
+    let discount = 0;
+    let appliedCoupon = null;
+    let couponError = null;
+
+    if (couponCode && couponCode !== 'undefined' && couponCode.trim() !== '') {
+      const now = new Date();
+      const normalizedCode = String(couponCode).trim().toUpperCase();
+      
+      const coupon = await Coupon.findOne({
+        code: normalizedCode,
+        isActive: true,
+        validFrom: { $lte: now },
+        validUntil: { $gte: now },
+      });
+
+      if (!coupon) {
+        couponError = "Coupon is invalid, inactive, or expired";
+      } else if (subtotal < coupon.minimumOrderAmount) {
+        couponError = `Minimum order amount of $${coupon.minimumOrderAmount} required. Your current total is $${subtotal}.`;
+      } else {
+        if (coupon.discountType === 'percentage') {
+          discount = subtotal * (coupon.discountValue / 100);
+          if (coupon.maximumDiscountAmount) {
+            discount = Math.min(discount, coupon.maximumDiscountAmount);
+          }
+        } else {
+          discount = coupon.discountValue;
+        }
+        discount = Math.min(discount, subtotal);
+        appliedCoupon = {
+          code: coupon.code,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+          description: coupon.description
+        };
+      }
+    }
+
+    // Calculate totals
+    const tax = subtotal * 0.15; // 15% tax
+    // Shipping cost: free inside Dhaka, 50 outside Dhaka
+    const city = parsedShippingAddress?.townCity || "";
+    const state = parsedShippingAddress?.state || "";
+    const isInsideDhaka = city.toLowerCase().includes("dhaka") || state.toLowerCase().includes("dhaka");
+    const shippingCost = isInsideDhaka ? 0 : 50;
+    const totalAmount = subtotal - discount + tax + shippingCost;
+
+    return res.json({
+      success: true,
+      data: {
+        items: validatedItems,
+        subtotal,
+        discount,
+        tax,
+        shippingCost,
+        totalAmount,
+        appliedCoupon,
+        couponError,
+        shippingAddress: parsedShippingAddress,
+        breakdown: {
+          subtotal: subtotal.toFixed(2),
+          discount: discount.toFixed(2),
+          tax: tax.toFixed(2),
+          shippingCost: shippingCost.toFixed(2),
+          totalAmount: totalAmount.toFixed(2),
+          taxRate: "15%",
+          shippingInfo: isInsideDhaka ? "Free shipping (inside Dhaka)" : "Shipping: $50 (outside Dhaka)"
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Calculate order error:", error);
+    return res.status(500).json({ message: "Server error during order calculation" });
+  }
+});
 
 export default router;
