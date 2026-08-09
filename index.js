@@ -18,6 +18,7 @@ import uploadRoutes from "./routes/upload.js";
 import returnRoutes from "./routes/returns.js";
 import refundRoutes from "./routes/refunds.js";
 import couponRoutes from "./routes/coupons.js";
+import paymentRoutes from "./routes/payments.js";
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 import adminAuthRoutes from "./routes/admin/adminAuth.js";
@@ -310,6 +311,8 @@ app.use("/api/upload", uploadLimiter, noCache, uploadRoutes);
 app.use("/api/returns", generalLimiter, noCache, returnRoutes);
 app.use("/api/refunds", generalLimiter, noCache, refundRoutes);
 app.use("/api/coupons", generalLimiter, noCache, couponRoutes);
+app.use("/api/payments", generalLimiter, noCache, paymentRoutes);
+app.use("/api/payments/mock", generalLimiter, noCache, mockPaymentRoutes);
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", authLimiter, noCache, adminAuthRoutes);

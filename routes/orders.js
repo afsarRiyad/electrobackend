@@ -226,11 +226,11 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
 
       if (!coupon) {
         console.log('Coupon not found or invalid');
-        throw new CouponError("Coupon is invalid, inactive, or expired");
+        throw new CouponError("Coupon is invalid, inactive, or expired. Please check the code and try again.");
       }
       if (subtotal < coupon.minimumOrderAmount) {
         console.log('Order amount too low. Subtotal:', subtotal, 'Required:', coupon.minimumOrderAmount);
-        throw new CouponError(`Minimum order amount of $${coupon.minimumOrderAmount} required`);
+        throw new CouponError(`Minimum order amount of $${coupon.minimumOrderAmount} required. Your current total is $${subtotal}.`);
       }
 
       const reservedCoupon = await Coupon.findOneAndUpdate(
@@ -254,7 +254,7 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
 
       if (!reservedCoupon) {
         console.log('Coupon reservation failed - usage limit exceeded');
-        throw new CouponError("Coupon usage limit exceeded");
+        throw new CouponError("This coupon has reached its maximum usage limit and is no longer available.");
       }
       couponReservation = reservedCoupon;
 
@@ -273,8 +273,8 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
           const duplicateFields = Object.keys(error.keyPattern || {});
           throw new CouponError(
             duplicateFields.includes("ipAddress")
-              ? "This coupon has already been redeemed from this IP address"
-              : "You have already redeemed this coupon"
+              ? "This coupon has already been redeemed from this IP address. Each coupon can only be used once per IP address."
+              : "You have already redeemed this coupon. Each coupon can only be used once per user."
           );
         }
         throw error;
@@ -326,8 +326,8 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       totalAmount,
       status: "pending",
       paymentMethod,
-      paymentStatus: paymentMethod === "cash_on_delivery" ? "unpaid" : "paid",
-      transactionId: paymentMethod !== "cash_on_delivery" ? `TXN-${Date.now()}` : null,
+      paymentStatus: paymentMethod === "cash_on_delivery" ? "unpaid" : "pending",
+      transactionId: paymentMethod !== "cash_on_delivery" ? `TEMP-${Date.now()}` : null,
       shippingAddress: parsedShippingAddress,
       notes,
     });
