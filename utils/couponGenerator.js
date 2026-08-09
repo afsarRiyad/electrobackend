@@ -11,7 +11,7 @@ export const generateUniqueCouponCode = () => {
   return code;
 };
 
-export const createWelcomeCouponForUser = async (userEmail, discountValue = 40, discountType = 'percentage') => {
+export const createWelcomeCouponForUser = async (userEmail, userId, discountValue = 40, discountType = 'percentage') => {
   const { Coupon } = await import('../utils/models.js');
   
   // Generate unique coupon code with collision detection
@@ -47,6 +47,7 @@ export const createWelcomeCouponForUser = async (userEmail, discountValue = 40, 
     isActive: true,
     validFrom: now,
     validUntil: validUntil,
+    createdBy: userId, // Add the user who is receiving the coupon as the creator
   });
   
   return coupon;

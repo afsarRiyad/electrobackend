@@ -118,7 +118,7 @@ const releaseSignupIPReservation = async (ipAddress, reservationId) => {
   }
 };
 
-const getWelcomeOffer = async (userEmail) => {
+const getWelcomeOffer = async (user) => {
   // Option 1: Use existing system coupon (from env variable)
   const envCouponCode = process.env.WELCOME_COUPON_CODE?.trim().toUpperCase();
   if (envCouponCode) {
@@ -145,7 +145,7 @@ const getWelcomeOffer = async (userEmail) => {
 
   // Option 2: Create unique single-use coupon for each verified user
   try {
-    const uniqueCoupon = await createWelcomeCouponForUser(userEmail);
+    const uniqueCoupon = await createWelcomeCouponForUser(user.email, user._id);
     return {
       code: uniqueCoupon.code,
       description: uniqueCoupon.description,
@@ -684,7 +684,7 @@ router.post("/verify-otp", async (req, res) => {
 
     console.log('User verified:', user.email, 'Username:', user.username);
 
-    const welcomeOffer = await getWelcomeOffer(user.email).catch((error) => {
+    const welcomeOffer = await getWelcomeOffer(user).catch((error) => {
       console.error("Failed to load welcome offer:", error);
       return null;
     });
