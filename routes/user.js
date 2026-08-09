@@ -275,6 +275,11 @@ router.get("/addresses", protect, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    console.log('Retrieved addresses for user:', req.user.email, {
+      billingAddress: user.billingAddress,
+      shippingAddress: user.shippingAddress
+    });
+
     return res.json({ data: user });
   } catch (err) {
     console.error("Get addresses error:", err);
@@ -287,6 +292,8 @@ router.get("/addresses", protect, async (req, res) => {
 router.put("/billing-address", protect, async (req, res) => {
   try {
     const { billingAddress } = req.body || {};
+
+    console.log('Billing address update request:', billingAddress);
 
     if (!billingAddress) {
       return res.status(400).json({ message: "Billing address is required" });
@@ -310,6 +317,8 @@ router.put("/billing-address", protect, async (req, res) => {
 router.put("/shipping-address", protect, async (req, res) => {
   try {
     const { shippingAddress } = req.body || {};
+
+    console.log('Shipping address update request:', shippingAddress);
 
     if (!shippingAddress) {
       return res.status(400).json({ message: "Shipping address is required" });

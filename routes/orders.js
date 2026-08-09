@@ -129,6 +129,15 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       couponCode,
     } = req.body;
 
+    console.log('Order creation request:', { 
+      items, 
+      shippingAddress, 
+      paymentMethod, 
+      notes, 
+      couponCode,
+      fullShippingAddress: JSON.stringify(shippingAddress, null, 2)
+    });
+
     if (!items || items.length === 0) {
       throw new ValidationError("Order items are required");
     }
@@ -264,8 +273,9 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
     // Calculate totals
     const tax = subtotal * 0.15; // 15% tax
     // Shipping cost: free inside Dhaka, 50 outside Dhaka
-    const isInsideDhaka = shippingAddress.townCity && 
-      shippingAddress.townCity.toLowerCase().includes("dhaka");
+    const city = shippingAddress.townCity || shippingAddress.city || "";
+    const state = shippingAddress.state || "";
+    const isInsideDhaka = city.toLowerCase().includes("dhaka") || state.toLowerCase().includes("dhaka");
     const shippingCost = isInsideDhaka ? 0 : 50;
     const totalAmount = subtotal - discount + tax + shippingCost;
 
