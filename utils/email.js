@@ -190,8 +190,8 @@ export const sendPasswordResetEmail = async (email, resetToken, username) => {
   }
 };
 
-// Send welcome email
-export const sendWelcomeEmail = async (email, username) => {
+// Send welcome email with coupon
+export const sendWelcomeEmail = async (email, username, couponCode = null) => {
   try {
     if (!process.env.BREVO_API_KEY) {
       console.error("Brevo API key not configured. Missing BREVO_API_KEY.");
@@ -210,7 +210,7 @@ export const sendWelcomeEmail = async (email, username) => {
           name: process.env.EMAIL_FROM_NAME || 'Electro'
         },
         to: [{ email: email }],
-        subject: "Welcome to Electro!",
+        subject: "Welcome to Electro! 🎉 Your 40% OFF Coupon Inside",
         htmlContent: `
           <!DOCTYPE html>
           <html>
@@ -246,6 +246,31 @@ export const sendWelcomeEmail = async (email, username) => {
                 border-radius: 6px;
                 margin-bottom: 20px;
               }
+              .coupon-box {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 10px;
+                text-align: center;
+                margin: 25px 0;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              }
+              .coupon-code {
+                font-size: 36px;
+                font-weight: bold;
+                letter-spacing: 3px;
+                margin: 15px 0;
+                font-family: 'Courier New', monospace;
+                background: rgba(255,255,255,0.2);
+                padding: 15px;
+                border-radius: 5px;
+                border: 2px dashed rgba(255,255,255,0.5);
+              }
+              .discount-text {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+              }
               .button {
                 display: inline-block;
                 background-color: #27ae60;
@@ -275,6 +300,17 @@ export const sendWelcomeEmail = async (email, username) => {
               <div class="content">
                 <p>Hi <strong>${username}</strong>,</p>
                 <p>Welcome to Electro! We're excited to have you on board.</p>
+                <p>As a special welcome gift, we've prepared an exclusive offer just for you:</p>
+                
+                ${couponCode ? `
+                <div class="coupon-box">
+                  <div class="discount-text">🎁 40% OFF Your First Order!</div>
+                  <div class="coupon-code">${couponCode}</div>
+                  <p style="margin-top: 15px; font-size: 14px;">Use this code at checkout</p>
+                  <p style="font-size: 12px; opacity: 0.9;">Valid for 1 month • Single use only</p>
+                </div>
+                ` : ''}
+                
                 <p>Your account has been successfully created and you can now:</p>
                 <ul>
                   <li>🛒 Browse our wide range of electronics</li>

@@ -4,10 +4,11 @@ import crypto from "crypto";
 import { Router } from "express";
 import { Coupon, SignupIPRateLimit, User } from "../utils/models.js";
 import { protect } from "../utils/authMiddleware.js";
-import { sendPasswordResetEmail, sendOTPEmail } from "../utils/email.js";
+import { sendPasswordResetEmail, sendOTPEmail, sendWelcomeEmail } from "../utils/email.js";
 import { validateSignup, validateLogin } from "../utils/validation.js";
 import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
 import { generateOTP, validateOTP, generateOTPExpiry } from "../utils/otp.js";
+import { createWelcomeCouponForUser } from "../utils/couponGenerator.js";
 
 const router = Router();
 
@@ -113,35 +114,54 @@ const reserveSignupIP = async (ipAddress) => {
   return null;
 };
 
-const releaseSignupIPReservation = (ipAddress, reservationId) =>
-  SignupIPRateLimit.updateOne(
+const releaseSignupIPReservation = (ipAddress, reservationId) => {
+  return SignupIPRateLimit.updateOne(
     { ipAddress },
     { $pull: { signupEvents: { reservationId } } }
   );
+};
 
-const getWelcomeOffer = async () => {
-  const code = process.env.WELCOME_COUPON_CODE?.trim().toUpperCase();
-  if (!code) return null;
+const getWelcomeOffer = async (userEmail) => {
+  // Option 1: Use existing system coupon (from env variable)
+  const envCouponCode = process.env.WELCOME_COUPON_CODE?.trim().toUpperCase();
+  if (envCouponCode) {
+    const now = new Date();
+    const coupon = await Coupon.findOne({
+      code: envCouponCode,
+      isActive: true,
+      validFrom: { $lte: now },
+      validUntil: { $gte: now },
+    }).lean();
 
-  const now = new Date();
-  const coupon = await Coupon.findOne({
-    code,
-    isActive: true,
-    validFrom: { $lte: now },
-    validUntil: { $gte: now },
-  }).lean();
+    if (coupon) {
+      return {
+        code: coupon.code,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maximumDiscountAmount: coupon.maximumDiscountAmount,
+        minimumOrderAmount: coupon.minimumOrderAmount,
+        validUntil: coupon.validUntil,
+      };
+    }
+  }
 
-  if (!coupon) return null;
-
-  return {
-    code: coupon.code,
-    description: coupon.description,
-    discountType: coupon.discountType,
-    discountValue: coupon.discountValue,
-    maximumDiscountAmount: coupon.maximumDiscountAmount,
-    minimumOrderAmount: coupon.minimumOrderAmount,
-    validUntil: coupon.validUntil,
-  };
+  // Option 2: Create unique single-use coupon for each verified user
+  try {
+    const uniqueCoupon = await createWelcomeCouponForUser(userEmail);
+    return {
+      code: uniqueCoupon.code,
+      description: uniqueCoupon.description,
+      discountType: uniqueCoupon.discountType,
+      discountValue: uniqueCoupon.discountValue,
+      maximumDiscountAmount: uniqueCoupon.maximumDiscountAmount,
+      minimumOrderAmount: uniqueCoupon.minimumOrderAmount,
+      validUntil: uniqueCoupon.validUntil,
+    };
+  } catch (error) {
+    console.error("Failed to create unique welcome coupon:", error);
+    return null;
+  }
 };
 
 // @desc    Register a new user
@@ -658,10 +678,17 @@ router.post("/verify-otp", async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
-    const welcomeOffer = await getWelcomeOffer().catch((error) => {
+    const welcomeOffer = await getWelcomeOffer(user.email).catch((error) => {
       console.error("Failed to load welcome offer:", error);
       return null;
     });
+
+    // Send welcome email with coupon code
+    if (welcomeOffer && welcomeOffer.code) {
+      await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
+        console.error("Failed to send welcome email:", error);
+      });
+    }
 
     res.json({
       success: true,
@@ -748,10 +775,17 @@ router.post("/verify-otp/me", protect, async (req, res) => {
     user.emailVerifiedAt = new Date();
     await user.save();
 
-    const welcomeOffer = await getWelcomeOffer().catch((error) => {
+    const welcomeOffer = await getWelcomeOffer(user.email).catch((error) => {
       console.error("Failed to load welcome offer:", error);
       return null;
     });
+
+    // Send welcome email with coupon code
+    if (welcomeOffer && welcomeOffer.code) {
+      await sendWelcomeEmail(user.email, user.username, welcomeOffer.code).catch((error) => {
+        console.error("Failed to send welcome email:", error);
+      });
+    }
 
     res.json({
       success: true,

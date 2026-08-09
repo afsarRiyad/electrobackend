@@ -312,7 +312,7 @@ app.use("/api/returns", generalLimiter, noCache, returnRoutes);
 app.use("/api/refunds", generalLimiter, noCache, refundRoutes);
 app.use("/api/coupons", generalLimiter, noCache, couponRoutes);
 app.use("/api/payments", generalLimiter, noCache, paymentRoutes);
-app.use("/api/payments/mock", generalLimiter, noCache, mockPaymentRoutes);
+
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 app.use("/api/admin/auth", authLimiter, noCache, adminAuthRoutes);

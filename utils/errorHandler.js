@@ -75,6 +75,7 @@ const errorHandler = (err, req, res, next) => {
     message: err.message,
     statusCode: err.statusCode,
     errorCode: err.errorCode,
+    name: err.name,
     stack: isDevelopment ? err.stack : undefined,
     url: req.url,
     method: req.method,
@@ -86,11 +87,14 @@ const errorHandler = (err, req, res, next) => {
   let message = err.message || 'Internal server error';
   let errorCode = err.errorCode || 'INTERNAL_ERROR';
 
-  // Handle specific error types
+  // Handle specific error types - preserve custom messages for our custom errors
   if (err.name === 'ValidationError') {
     statusCode = 400;
     errorCode = 'VALIDATION_ERROR';
-    message = 'Validation Error';
+    // Don't override custom message for ValidationError
+    if (!err.message || err.message === 'Validation Error') {
+      message = 'Validation Error';
+    }
   } else if (err.name === 'CastError') {
     statusCode = 400;
     errorCode = 'INVALID_ID';
@@ -112,6 +116,21 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 429;
     errorCode = 'RATE_LIMIT_EXCEEDED';
     message = err.message || 'Too many requests';
+  } else if (err.errorCode === 'COUPON_ERROR') {
+    // Always preserve coupon error messages
+    statusCode = 400;
+    errorCode = 'COUPON_ERROR';
+    message = err.message; // Keep the custom coupon message
+  } else if (err.errorCode === 'STOCK_ERROR') {
+    // Always preserve stock error messages
+    statusCode = 400;
+    errorCode = 'STOCK_ERROR';
+    message = err.message; // Keep the custom stock message
+  } else if (err.errorCode === 'ORDER_ERROR') {
+    // Always preserve order error messages
+    statusCode = err.statusCode || 400;
+    errorCode = 'ORDER_ERROR';
+    message = err.message; // Keep the custom order message
   }
 
   // Send error response
