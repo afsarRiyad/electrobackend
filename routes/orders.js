@@ -228,6 +228,19 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
         console.log('Coupon not found or invalid');
         throw new CouponError("Coupon is invalid, inactive, or expired. Please check the code and try again.");
       }
+      
+      // Check if this is a welcome coupon - it can only be used by the user it was created for
+      if (coupon.description && coupon.description.includes('Welcome coupon for')) {
+        console.log('This is a welcome coupon. Checking if user is the intended recipient.');
+        console.log('Coupon createdBy:', coupon.createdBy);
+        console.log('Current user ID:', req.user._id);
+        
+        if (coupon.createdBy && coupon.createdBy.toString() !== req.user._id.toString()) {
+          console.log('Coupon created for different user. Access denied.');
+          throw new CouponError("This welcome coupon can only be used by the account it was issued to. Each welcome coupon is unique to its recipient.");
+        }
+      }
+      
       if (subtotal < coupon.minimumOrderAmount) {
         console.log('Order amount too low. Subtotal:', subtotal, 'Required:', coupon.minimumOrderAmount);
         throw new CouponError(`Minimum order amount of $${coupon.minimumOrderAmount} required. Your current total is $${subtotal}.`);
@@ -293,7 +306,7 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
     // Calculate totals
     const tax = subtotal * 0.15; // 15% tax
     // Shipping cost: free inside Dhaka, 50 outside Dhaka
-    const city = parsedShippingAddress.townCity || parsedShippingAddress.city || "";
+    const city = parsedShippingAddress.townCity || "";
     const state = parsedShippingAddress.state || "";
     const isInsideDhaka = city.toLowerCase().includes("dhaka") || state.toLowerCase().includes("dhaka");
     const shippingCost = isInsideDhaka ? 0 : 50;
