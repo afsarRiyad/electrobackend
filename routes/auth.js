@@ -67,60 +67,55 @@ const reserveSignupIP = async (ipAddress) => {
   const windowStart = new Date(now.getTime() - SIGNUP_IP_WINDOW_MS);
   const expiresAt = new Date(now.getTime() + SIGNUP_IP_WINDOW_MS);
   const reservationId = crypto.randomUUID();
-  const recentEvents = {
-    $filter: {
-      input: { $ifNull: ["$signupEvents", []] },
-      as: "event",
-      cond: { $gte: ["$$event.createdAt", windowStart] },
-    },
-  };
-  const filter = {
-    ipAddress,
-    $expr: { $lt: [{ $size: recentEvents }, SIGNUP_IP_MAX_ACCOUNTS] },
-  };
-  const update = [
-    {
-      $set: {
-        signupEvents: {
-          $concatArrays: [recentEvents, [{ reservationId, createdAt: now }]],
-        },
-        expiresAt,
-      },
-    },
-  ];
 
-  // An existing document is updated atomically. If it does not exist, a
-  // concurrent first signup can race only on the unique ipAddress index; retry
-  // once so the loser evaluates the newly-created ledger document.
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const reservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
-      new: true,
-      updatePipeline: true,
-    });
-    if (reservation) return reservationId;
-
-    if (await SignupIPRateLimit.exists({ ipAddress })) return null;
-
+  // First check if we can make a reservation
+  const existingRecord = await SignupIPRateLimit.findOne({ ipAddress });
+  
+  if (existingRecord) {
+    // Filter recent events within the window
+    const recentEvents = existingRecord.signupEvents.filter(
+      event => new Date(event.createdAt) >= windowStart
+    );
+    
+    if (recentEvents.length >= SIGNUP_IP_MAX_ACCOUNTS) {
+      return null; // Limit reached
+    }
+    
+    // Add new reservation
+    existingRecord.signupEvents.push({ reservationId, createdAt: now });
+    existingRecord.expiresAt = expiresAt;
+    await existingRecord.save();
+    return reservationId;
+  } else {
+    // Create new record
     try {
-      const createdReservation = await SignupIPRateLimit.findOneAndUpdate(filter, update, {
-        new: true,
-        upsert: true,
-        updatePipeline: true,
+      await SignupIPRateLimit.create({
+        ipAddress,
+        signupEvents: [{ reservationId, createdAt: now }],
+        expiresAt,
       });
-      if (createdReservation) return reservationId;
+      return reservationId;
     } catch (error) {
-      if (error?.code !== 11000 || attempt === 1) throw error;
+      if (error?.code === 11000) {
+        // Concurrent creation - retry once
+        return null;
+      }
+      throw error;
     }
   }
-
-  return null;
 };
 
-const releaseSignupIPReservation = (ipAddress, reservationId) => {
-  return SignupIPRateLimit.updateOne(
-    { ipAddress },
-    { $pull: { signupEvents: { reservationId } } }
-  );
+const releaseSignupIPReservation = async (ipAddress, reservationId) => {
+  try {
+    const result = await SignupIPRateLimit.updateOne(
+      { ipAddress },
+      { $pull: { signupEvents: { reservationId } } }
+    );
+    return result;
+  } catch (error) {
+    console.error("Failed to release IP reservation:", error);
+    return null;
+  }
 };
 
 const getWelcomeOffer = async (userEmail) => {

@@ -338,7 +338,12 @@ export const sendWelcomeEmail = async (email, username, couponCode = null) => {
     console.log("Welcome email sent successfully:", data);
     return true;
   } catch (error) {
-    console.error("Error sending welcome email:", error);
+    console.error("Error sending welcome email:", {
+      error: error.message,
+      email: email,
+      couponCode: couponCode,
+      hasApiKey: !!process.env.BREVO_API_KEY
+    });
     return false;
   }
 };

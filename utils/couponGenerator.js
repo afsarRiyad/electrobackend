@@ -14,7 +14,22 @@ export const generateUniqueCouponCode = () => {
 export const createWelcomeCouponForUser = async (userEmail, discountValue = 40, discountType = 'percentage') => {
   const { Coupon } = await import('../utils/models.js');
   
-  const code = generateUniqueCouponCode();
+  // Generate unique coupon code with collision detection
+  let code;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  while (attempts < maxAttempts) {
+    code = generateUniqueCouponCode();
+    const existingCoupon = await Coupon.findOne({ code });
+    if (!existingCoupon) break;
+    attempts++;
+  }
+  
+  if (attempts >= maxAttempts) {
+    throw new Error("Failed to generate unique coupon code after multiple attempts");
+  }
+  
   const now = new Date();
   const validUntil = new Date();
   validUntil.setMonth(validUntil.getMonth() + 1); // Valid for 1 month
