@@ -129,20 +129,30 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       couponCode,
     } = req.body;
 
+    // Parse shippingAddress if it's a string
+    let parsedShippingAddress = shippingAddress;
+    if (typeof shippingAddress === 'string') {
+      try {
+        parsedShippingAddress = JSON.parse(shippingAddress);
+      } catch (e) {
+        console.error('Failed to parse shippingAddress string:', e);
+      }
+    }
+
     console.log('Order creation request:', { 
       items, 
-      shippingAddress, 
+      shippingAddress: parsedShippingAddress, 
       paymentMethod, 
       notes, 
       couponCode,
-      fullShippingAddress: JSON.stringify(shippingAddress, null, 2)
+      fullShippingAddress: JSON.stringify(parsedShippingAddress, null, 2)
     });
 
     if (!items || items.length === 0) {
       throw new ValidationError("Order items are required");
     }
 
-    if (!shippingAddress) {
+    if (!parsedShippingAddress) {
       throw new ValidationError("Shipping address is required");
     }
 
@@ -199,9 +209,12 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
     // customer merely previews it in the cart.
     let discount = 0;
     let appliedCoupon = null;
-    if (couponCode) {
+    if (couponCode && couponCode !== 'undefined' && couponCode.trim() !== '') {
+      console.log('Processing coupon code:', couponCode);
       const now = new Date();
       const normalizedCode = String(couponCode).trim().toUpperCase();
+      console.log('Normalized coupon code:', normalizedCode);
+      
       const coupon = await Coupon.findOne({
         code: normalizedCode,
         isActive: true,
@@ -209,10 +222,14 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
         validUntil: { $gte: now },
       });
 
+      console.log('Found coupon:', coupon);
+
       if (!coupon) {
+        console.log('Coupon not found or invalid');
         throw new CouponError("Coupon is invalid, inactive, or expired");
       }
       if (subtotal < coupon.minimumOrderAmount) {
+        console.log('Order amount too low. Subtotal:', subtotal, 'Required:', coupon.minimumOrderAmount);
         throw new CouponError(`Minimum order amount of $${coupon.minimumOrderAmount} required`);
       }
 
@@ -233,7 +250,10 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
         { new: true }
       );
 
+      console.log('Reserved coupon:', reservedCoupon);
+
       if (!reservedCoupon) {
+        console.log('Coupon reservation failed - usage limit exceeded');
         throw new CouponError("Coupon usage limit exceeded");
       }
       couponReservation = reservedCoupon;
@@ -273,8 +293,8 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
     // Calculate totals
     const tax = subtotal * 0.15; // 15% tax
     // Shipping cost: free inside Dhaka, 50 outside Dhaka
-    const city = shippingAddress.townCity || shippingAddress.city || "";
-    const state = shippingAddress.state || "";
+    const city = parsedShippingAddress.townCity || parsedShippingAddress.city || "";
+    const state = parsedShippingAddress.state || "";
     const isInsideDhaka = city.toLowerCase().includes("dhaka") || state.toLowerCase().includes("dhaka");
     const shippingCost = isInsideDhaka ? 0 : 50;
     const totalAmount = subtotal - discount + tax + shippingCost;
@@ -286,7 +306,7 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
         name: req.user.username,
         email: req.user.email,
         phone: req.user.phone || null,
-        address: shippingAddress,
+        address: parsedShippingAddress,
       },
       { upsert: true, new: true }
     );
@@ -308,7 +328,7 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       paymentMethod,
       paymentStatus: paymentMethod === "cash_on_delivery" ? "unpaid" : "paid",
       transactionId: paymentMethod !== "cash_on_delivery" ? `TXN-${Date.now()}` : null,
-      shippingAddress,
+      shippingAddress: parsedShippingAddress,
       notes,
     });
     orderCreated = true;
