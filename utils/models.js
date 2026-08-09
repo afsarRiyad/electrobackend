@@ -282,16 +282,11 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate order number before saving using atomic counter
+// Auto-generate order number before saving using random 6-digit number
 orderSchema.pre("save", async function () {
   if (!this.orderNumber) {
-    const Counter = mongoose.model("Counter");
-    const counter = await Counter.findOneAndUpdate(
-      { name: "orderNumber" },
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-    this.orderNumber = `ORD-${String(counter.seq).padStart(6, "0")}`;
+    const randomSixDigits = Math.floor(100000 + Math.random() * 900000);
+    this.orderNumber = `#${randomSixDigits}`;
   }
 });
 

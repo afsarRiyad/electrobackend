@@ -36,6 +36,7 @@ import { connectDB } from "./utils/db.js";
 import { generalLimiter, authLimiter, adminLimiter, uploadLimiter } from "./utils/rateLimiter.js";
 import { apiCache, productCache, noCache } from "./utils/cacheHeaders.js";
 import { passport } from "./utils/oauth.js";
+import { errorHandler } from "./utils/errorHandler.js";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
@@ -329,49 +330,7 @@ app.use((req, res) => {
 });
 
 // ─── Global Error Handler ───────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error("Error:", err);
-  
-  // Mongoose validation error
-  if (err.name === "ValidationError") {
-    return res.status(400).json({
-      message: "Validation Error",
-      errors: Object.values(err.errors).map(e => ({
-        field: e.path,
-        message: e.message,
-      })),
-    });
-  }
-  
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
-    return res.status(409).json({
-      message: `${field} already exists`,
-    });
-  }
-  
-  // JWT errors
-  if (err.name === "JsonWebTokenError") {
-    return res.status(401).json({ message: "Invalid token" });
-  }
-  
-  if (err.name === "TokenExpiredError") {
-    return res.status(401).json({ message: "Token expired" });
-  }
-  
-  // Rate limit error
-  if (err.status === 429) {
-    return res.status(429).json({ message: err.message });
-  }
-  
-  // Default error
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    message: err.message || "Internal server error",
-    ...(isDevelopment && { stack: err.stack }),
-  });
-});
+app.use(errorHandler);
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────────
 const server = app.listen(port, () => {
