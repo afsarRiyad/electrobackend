@@ -77,6 +77,19 @@ export const getHierarchicalCategories = async () => {
       .sort({ displayOrder: 1, name: 1 })
       .lean();
 
+    // Fallback if no Category documents exist in database yet
+    if (categories.length === 0) {
+      const flatCategories = await getCategories();
+      return flatCategories.map((cat, idx) => ({
+        _id: `cat-fallback-${idx}`,
+        name: cat.name,
+        slug: cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        image: cat.image,
+        count: cat.count,
+        children: [],
+      }));
+    }
+
     // Build hierarchical structure
     const categoryMap = new Map();
     const rootCategories = [];
