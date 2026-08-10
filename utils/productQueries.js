@@ -122,16 +122,33 @@ export const getHierarchicalCategories = async () => {
       }
     });
 
-    // Add images to categories
-    const addImages = (categories) => {
-      return categories.map(category => ({
-        ...category,
-        image: category.image || categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
-        children: category.children.length > 0 ? addImages(category.children) : []
-      }));
+    // Fetch product counts per category name
+    const categoryCounts = await Product.aggregate([
+      { $unwind: "$categories" },
+      { $group: { _id: "$categories", count: { $sum: 1 } } }
+    ]);
+    const countMap = new Map(categoryCounts.map(item => [item._id, item.count]));
+
+    // Add images and counts to categories recursively
+    const processCategories = (catList) => {
+      return catList.map(category => {
+        const processedChildren = category.children.length > 0 ? processCategories(category.children) : [];
+        
+        // Sum counts of direct matches plus children counts
+        const directCount = countMap.get(category.name) || 0;
+        const childrenCount = processedChildren.reduce((sum, child) => sum + (child.count || 0), 0);
+        const totalCount = directCount > 0 ? directCount : childrenCount;
+
+        return {
+          ...category,
+          count: totalCount,
+          image: category.image || categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+          children: processedChildren
+        };
+      });
     };
 
-    return addImages(rootCategories);
+    return processCategories(rootCategories);
   } catch (error) {
     console.error("Error fetching hierarchical categories:", error);
     return [];
