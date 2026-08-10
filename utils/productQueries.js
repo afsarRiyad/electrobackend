@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { Product } from "./models.js";
+import { Product, Category } from "./models.js";
 import { homeV3Sections } from "../data/products.js";
 
 const normalize = (value = "") => value.toString().trim().toLowerCase();
@@ -70,6 +70,61 @@ export const getCategories = async () => {
   }
 };
 
+export const getHierarchicalCategories = async () => {
+  try {
+    const categories = await Category.find({ isActive: true })
+      .populate('parent', 'name slug')
+      .sort({ displayOrder: 1, name: 1 })
+      .lean();
+
+    // Build hierarchical structure
+    const categoryMap = new Map();
+    const rootCategories = [];
+
+    // First pass: create map of all categories
+    categories.forEach(category => {
+      categoryMap.set(category._id.toString(), {
+        ...category,
+        children: []
+      });
+    });
+
+    // Second pass: build hierarchy
+    categories.forEach(category => {
+      const categoryWithChildren = categoryMap.get(category._id.toString());
+      
+      if (category.parent) {
+        const parentId = category.parent._id
+          ? category.parent._id.toString()
+          : category.parent.toString();
+        const parent = categoryMap.get(parentId);
+        if (parent) {
+          parent.children.push(categoryWithChildren);
+        } else {
+          // If parent is inactive or not found, promote active child to root level
+          rootCategories.push(categoryWithChildren);
+        }
+      } else {
+        rootCategories.push(categoryWithChildren);
+      }
+    });
+
+    // Add images to categories
+    const addImages = (categories) => {
+      return categories.map(category => ({
+        ...category,
+        image: category.image || categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+        children: category.children.length > 0 ? addImages(category.children) : []
+      }));
+    };
+
+    return addImages(rootCategories);
+  } catch (error) {
+    console.error("Error fetching hierarchical categories:", error);
+    return [];
+  }
+};
+
 export const getBrands = async () => {
   if (cachedBrands) return cachedBrands;
   
@@ -93,24 +148,102 @@ export const findProduct = async (idOrSlug) => {
   try {
     const normalized = idOrSlug.toString().trim();
 
+    let product = null;
+
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      const product = await Product.findById(idOrSlug).lean();
-      if (product) return product;
+      product = await Product.findById(idOrSlug).lean();
+      if (product) return await addRelatedProducts(product);
     }
 
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      const product = await Product.findOne({ id: numericId }).lean();
-      if (product) return product;
+      product = await Product.findOne({ id: numericId }).lean();
+      if (product) return await addRelatedProducts(product);
     }
     
     // 3. Fallback to slug match
-    return await Product.findOne({ slug: normalized.toLowerCase() }).lean();
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).lean();
+    if (product) return await addRelatedProducts(product);
+    
+    return null;
   } catch (error) {
     console.error(`Error finding product ${idOrSlug}:`, error);
     return null;
+  }
+};
+
+const addRelatedProducts = async (product) => {
+  try {
+    // Get random combo products (random selection from all products)
+    const randomComboProducts = await Product.aggregate([
+      { $match: { _id: { $ne: product._id } } },
+      { $sample: { size: 4 } },
+      {
+        $project: {
+          id: 1,
+          name: 1,
+          slug: 1,
+          price: 1,
+          regularPrice: 1,
+          salePrice: 1,
+          rating: 1,
+          reviews: 1,
+          stock: 1,
+          image: 1,
+          categories: 1,
+          tags: 1,
+          brand: 1
+        }
+      }
+    ]);
+
+    // Get 4 related products based on category, brand, or similar price
+    const relatedProducts = await Product.aggregate([
+      {
+        $match: {
+          _id: { $ne: product._id },
+          $or: [
+            { categories: { $in: product.categories || [] } },
+            { brand: product.brand },
+            {
+              price: {
+                $gte: Math.max(0, product.price - 50),
+                $lte: product.price + 50
+              }
+            }
+          ]
+        }
+      },
+      { $sample: { size: 4 } },
+      {
+        $project: {
+          id: 1,
+          name: 1,
+          slug: 1,
+          price: 1,
+          regularPrice: 1,
+          salePrice: 1,
+          rating: 1,
+          reviews: 1,
+          stock: 1,
+          image: 1,
+          categories: 1,
+          tags: 1,
+          brand: 1
+        }
+      }
+    ]);
+
+    return {
+      ...product,
+      randomCombo: randomComboProducts,
+      relatedProducts: relatedProducts
+    };
+  } catch (error) {
+    console.error('Error fetching related products:', error);
+    return product;
   }
 };
 

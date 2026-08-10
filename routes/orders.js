@@ -22,17 +22,37 @@ router.get("/track/:orderNumber", asyncHandler(async (req, res) => {
   const { orderNumber } = req.params;
   const { email } = req.query;
 
+  console.log('Tracking order:', orderNumber, 'with email:', email);
+
   if (!orderNumber) {
     throw new ValidationError("Order number is required");
   }
 
-  const order = await Order.findOne({ orderNumber })
+  // Normalize order number - strip # if present, add it if missing
+  const normalizedOrderNumber = orderNumber.startsWith('#') 
+    ? orderNumber 
+    : `#${orderNumber}`;
+
+  console.log('Normalized order number:', normalizedOrderNumber);
+
+  let order = await Order.findOne({ orderNumber: normalizedOrderNumber })
     .populate("items.product", "name image")
     .lean();
 
+  // If not found with # prefix, try without it (for backward compatibility)
   if (!order) {
+    console.log('Order not found with # prefix, trying without');
+    order = await Order.findOne({ orderNumber: orderNumber })
+      .populate("items.product", "name image")
+      .lean();
+  }
+
+  if (!order) {
+    console.log('Order not found with:', orderNumber);
     throw new NotFoundError("Order not found");
   }
+
+  console.log('Order found:', order.orderNumber, 'Customer email:', order.customerEmail);
 
   // If email is provided, verify it matches the order
   if (email) {
@@ -349,7 +369,7 @@ router.post("/", protect, requireVerification, activityMiddleware('create', 'ord
       totalAmount,
       status: "pending",
       paymentMethod,
-      paymentStatus: paymentMethod === "cash_on_delivery" ? "unpaid" : "pending",
+      paymentStatus: "unpaid",
       transactionId: paymentMethod !== "cash_on_delivery" ? `TEMP-${Date.now()}` : null,
       shippingAddress: parsedShippingAddress,
       notes,

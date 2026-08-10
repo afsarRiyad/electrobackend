@@ -4,6 +4,7 @@ import { protect } from "../../utils/authMiddleware.js";
 import { isAdmin, hasPermission } from "../../utils/adminMiddleware.js";
 import { activityMiddleware } from "../../utils/activityLog.js";
 import { clearCachePattern } from "../../utils/cache.js";
+import { clearProductCache } from "../../utils/productQueries.js";
 
 const router = Router();
 const guard = [protect, isAdmin];
@@ -202,6 +203,7 @@ router.post("/", ...guard, activityMiddleware('create', 'category'), async (req,
 
     // Clear category cache
     clearCachePattern("categories");
+    clearProductCache();
 
     return res.status(201).json({ message: "Category created", data: category });
   } catch (err) {
@@ -276,6 +278,7 @@ router.put("/:id", ...guard, activityMiddleware('update', 'category'), async (re
 
     // Clear category cache
     clearCachePattern("categories");
+    clearProductCache();
 
     return res.json({ message: "Category updated", data: updated });
   } catch (err) {
@@ -313,6 +316,7 @@ router.delete("/:id", ...guard, activityMiddleware('delete', 'category'), async 
 
     // Clear category cache
     clearCachePattern("categories");
+    clearProductCache();
 
     return res.json({ message: "Category deleted" });
   } catch (err) {
@@ -335,6 +339,7 @@ router.patch("/:id/toggle", ...guard, activityMiddleware('update', 'category'), 
 
     // Clear category cache
     clearCachePattern("categories");
+    clearProductCache();
 
     return res.json({ message: "Category status toggled", data: category });
   } catch (err) {
@@ -364,6 +369,7 @@ router.patch("/reorder", ...guard, async (req, res) => {
 
     // Clear category cache
     clearCachePattern("categories");
+    clearProductCache();
 
     return res.json({ message: "Categories reordered" });
   } catch (err) {

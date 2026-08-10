@@ -4,6 +4,7 @@ import {
   findProduct,
   getBrands,
   getCategories,
+  getHierarchicalCategories,
   getHomeV3Payload,
   queryProducts,
 } from "../utils/productQueries.js";
@@ -41,6 +42,10 @@ router.get("/products/:idOrSlug", async (req, res) => {
 
 router.get("/categories", async (req, res) => {
   res.json({ data: await getCategories() });
+});
+
+router.get("/categories/hierarchical", async (req, res) => {
+  res.json({ data: await getHierarchicalCategories() });
 });
 
 router.get("/brands", async (req, res) => {

@@ -133,6 +133,7 @@ app.get("/", (req, res) => {
       product: "/api/products/:idOrSlug",
       featured: "/api/products/featured",
       categories: "/api/categories",
+      hierarchicalCategories: "/api/categories/hierarchical",
       brands: "/api/brands",
       homeV3: "/api/home-v3",
       // Auth
