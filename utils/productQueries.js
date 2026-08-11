@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { Product, Category } from "./models.js";
-import { homeV3Sections } from "../data/products.js";
+import { homeV3Sections, products } from "../data/products.js";
 
 const normalize = (value = "") => value.toString().trim().toLowerCase();
 
@@ -165,11 +165,35 @@ export const getBrands = async () => {
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
     ]);
-    cachedBrands = brands;
-    return brands;
+
+    if (brands && brands.length > 0) {
+      cachedBrands = brands;
+      return brands;
+    }
+
+    // Fallback from products dataset if DB aggregation is empty
+    const brandMap = new Map();
+    products.forEach(p => {
+      if (p.brand) {
+        brandMap.set(p.brand, (brandMap.get(p.brand) || 0) + 1);
+      }
+    });
+    const fallbackBrands = Array.from(brandMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return fallbackBrands;
   } catch (error) {
     console.error("Error fetching brands:", error);
-    return [];
+    const brandMap = new Map();
+    products.forEach(p => {
+      if (p.brand) {
+        brandMap.set(p.brand, (brandMap.get(p.brand) || 0) + 1);
+      }
+    });
+    return Array.from(brandMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 };
 
@@ -187,6 +211,8 @@ export const getColors = async () => {
 
     const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
     const results = [];
+
+    // Try counting from database
     for (const color of commonColors) {
       const count = await Product.countDocuments({
         $or: [
@@ -198,10 +224,37 @@ export const getColors = async () => {
         results.push({ name: color, count });
       }
     }
+
+    if (results.length > 0) return results;
+
+    // Fallback from products dataset if DB is empty
+    for (const color of commonColors) {
+      const count = products.filter(p => 
+        (p.name && p.name.toLowerCase().includes(color.toLowerCase())) ||
+        (p.tags && p.tags.some(t => t.toLowerCase().includes(color.toLowerCase())))
+      ).length;
+
+      if (count > 0) {
+        results.push({ name: color, count });
+      }
+    }
+
     return results;
   } catch (error) {
     console.error("Error fetching colors:", error);
-    return [];
+    const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
+    const results = [];
+    for (const color of commonColors) {
+      const count = products.filter(p => 
+        (p.name && p.name.toLowerCase().includes(color.toLowerCase())) ||
+        (p.tags && p.tags.some(t => t.toLowerCase().includes(color.toLowerCase())))
+      ).length;
+
+      if (count > 0) {
+        results.push({ name: color, count });
+      }
+    }
+    return results;
   }
 };
 
