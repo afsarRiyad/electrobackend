@@ -50,11 +50,11 @@ router.get("/categories/hierarchical", async (req, res) => {
 });
 
 router.get("/brands", async (req, res) => {
-  res.json({ data: await getBrands() });
+  res.json({ data: await getBrands(req.query.category) });
 });
 
 router.get("/colors", async (req, res) => {
-  res.json({ data: await getColors() });
+  res.json({ data: await getColors(req.query.category) });
 });
 
 router.get("/home-v3", async (req, res) => {

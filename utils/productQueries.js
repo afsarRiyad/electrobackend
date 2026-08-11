@@ -155,25 +155,37 @@ export const getHierarchicalCategories = async () => {
   }
 };
 
-export const getBrands = async () => {
-  if (cachedBrands) return cachedBrands;
+export const getBrands = async (category = "") => {
+  const categoryTerm = normalize(category);
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  if (!categoryTerm && cachedBrands) return cachedBrands;
   
   try {
+    const matchFilter = { brand: { $ne: null, $exists: true, $ne: "" } };
+    if (categoryTerm) {
+      matchFilter.categories = { $regex: new RegExp(`^${escapeRegex(categoryTerm)}$`, "i") };
+    }
+
     const brands = await Product.aggregate([
-      { $match: { brand: { $ne: null, $exists: true, $ne: "" } } },
+      { $match: matchFilter },
       { $group: { _id: "$brand", count: { $sum: 1 } } },
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
     ]);
 
     if (brands && brands.length > 0) {
-      cachedBrands = brands;
+      if (!categoryTerm) cachedBrands = brands;
       return brands;
     }
 
     // Fallback from products dataset if DB aggregation is empty
     const brandMap = new Map();
-    products.forEach(p => {
+    const filteredProducts = categoryTerm 
+      ? products.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === categoryTerm))
+      : products;
+
+    filteredProducts.forEach(p => {
       if (p.brand) {
         brandMap.set(p.brand, (brandMap.get(p.brand) || 0) + 1);
       }
@@ -186,7 +198,11 @@ export const getBrands = async () => {
   } catch (error) {
     console.error("Error fetching brands:", error);
     const brandMap = new Map();
-    products.forEach(p => {
+    const filteredProducts = categoryTerm 
+      ? products.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === categoryTerm))
+      : products;
+
+    filteredProducts.forEach(p => {
       if (p.brand) {
         brandMap.set(p.brand, (brandMap.get(p.brand) || 0) + 1);
       }
@@ -197,9 +213,18 @@ export const getBrands = async () => {
   }
 };
 
-export const getColors = async () => {
+export const getColors = async (category = "") => {
+  const categoryTerm = normalize(category);
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   try {
+    const matchFilter = {};
+    if (categoryTerm) {
+      matchFilter.categories = { $regex: new RegExp(`^${escapeRegex(categoryTerm)}$`, "i") };
+    }
+
     const attrColors = await Product.aggregate([
+      { $match: matchFilter },
       { $unwind: "$customAttributes" },
       { $match: { "customAttributes.name": { $regex: /^color$/i } } },
       { $group: { _id: "$customAttributes.value", count: { $sum: 1 } } },
@@ -214,12 +239,14 @@ export const getColors = async () => {
 
     // Try counting from database
     for (const color of commonColors) {
-      const count = await Product.countDocuments({
+      const dbFilter = {
+        ...matchFilter,
         $or: [
           { name: { $regex: color, $options: "i" } },
           { tags: { $regex: color, $options: "i" } }
         ]
-      });
+      };
+      const count = await Product.countDocuments(dbFilter);
       if (count > 0) {
         results.push({ name: color, count });
       }
@@ -228,8 +255,12 @@ export const getColors = async () => {
     if (results.length > 0) return results;
 
     // Fallback from products dataset if DB is empty
+    const filteredProducts = categoryTerm 
+      ? products.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === categoryTerm))
+      : products;
+
     for (const color of commonColors) {
-      const count = products.filter(p => 
+      const count = filteredProducts.filter(p => 
         (p.name && p.name.toLowerCase().includes(color.toLowerCase())) ||
         (p.tags && p.tags.some(t => t.toLowerCase().includes(color.toLowerCase())))
       ).length;
@@ -242,10 +273,14 @@ export const getColors = async () => {
     return results;
   } catch (error) {
     console.error("Error fetching colors:", error);
+    const filteredProducts = categoryTerm 
+      ? products.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === categoryTerm))
+      : products;
+
     const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
     const results = [];
     for (const color of commonColors) {
-      const count = products.filter(p => 
+      const count = filteredProducts.filter(p => 
         (p.name && p.name.toLowerCase().includes(color.toLowerCase())) ||
         (p.tags && p.tags.some(t => t.toLowerCase().includes(color.toLowerCase())))
       ).length;
