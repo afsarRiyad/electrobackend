@@ -103,12 +103,27 @@ export const getHierarchicalCategories = async () => {
       }
     });
 
-    // Get all category names for product filtering
+    // Get all category names and slugs for product filtering
     const allCategoryNames = categories.map(cat => cat.name);
+    const allCategorySlugs = categories.map(cat => cat.slug);
+
+    // Get all unique categories from products to see what's available
+    const productCategories = await Product.aggregate([
+      { $match: { isActive: true } },
+      { $unwind: "$categories" },
+      { $group: { _id: "$categories" } }
+    ]);
+    const availableProductCategories = productCategories.map(pc => pc._id);
 
     // Get available brands, colors, and price ranges for products in these categories
+    // Match by both category name and slug for better compatibility
     const productFilters = await Product.aggregate([
-      { $match: { categories: { $in: allCategoryNames }, isActive: true } },
+      { 
+        $match: { 
+          categories: { $in: availableProductCategories },
+          isActive: true 
+        } 
+      },
       { $unwind: "$categories" },
       {
         $group: {
