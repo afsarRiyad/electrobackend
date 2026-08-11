@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import { Product, Category } from "./models.js";
-import { homeV3Sections, products } from "../data/products.js";
+import { Product, Category, Review } from "./models.js";
+import { homeV3Sections } from "../data/products.js";
 
 const normalize = (value = "") => value.toString().trim().toLowerCase();
 
@@ -77,19 +77,6 @@ export const getHierarchicalCategories = async () => {
       .sort({ displayOrder: 1, name: 1 })
       .lean();
 
-    // Fallback if no Category documents exist in database yet
-    if (categories.length === 0) {
-      const flatCategories = await getCategories();
-      return flatCategories.map((cat, idx) => ({
-        _id: `cat-fallback-${idx}`,
-        name: cat.name,
-        slug: cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
-        image: cat.image,
-        count: cat.count,
-        children: [],
-      }));
-    }
-
     // Build hierarchical structure
     const categoryMap = new Map();
     const rootCategories = [];
@@ -107,48 +94,64 @@ export const getHierarchicalCategories = async () => {
       const categoryWithChildren = categoryMap.get(category._id.toString());
       
       if (category.parent) {
-        const parentId = category.parent._id
-          ? category.parent._id.toString()
-          : category.parent.toString();
-        const parent = categoryMap.get(parentId);
+        const parent = categoryMap.get(category.parent._id.toString());
         if (parent) {
           parent.children.push(categoryWithChildren);
-        } else {
-          // If parent is inactive or not found, promote active child to root level
-          rootCategories.push(categoryWithChildren);
         }
       } else {
         rootCategories.push(categoryWithChildren);
       }
     });
 
-    // Fetch product counts per category name
-    const categoryCounts = await Product.aggregate([
+    // Get all category names for product filtering
+    const allCategoryNames = categories.map(cat => cat.name);
+
+    // Get available brands, colors, and price ranges for products in these categories
+    const productFilters = await Product.aggregate([
+      { $match: { categories: { $in: allCategoryNames }, isActive: true } },
       { $unwind: "$categories" },
-      { $group: { _id: "$categories", count: { $sum: 1 } } }
+      {
+        $group: {
+          _id: "$categories",
+          brands: { $addToSet: "$brand" },
+          colors: { $addToSet: "$customAttributes.value" },
+          minPrice: { $min: "$price" },
+          maxPrice: { $max: "$price" }
+        }
+      }
     ]);
-    const countMap = new Map(categoryCounts.map(item => [item._id, item.count]));
 
-    // Add images and counts to categories recursively
-    const processCategories = (catList) => {
-      return catList.map(category => {
-        const processedChildren = category.children.length > 0 ? processCategories(category.children) : [];
-        
-        // Sum counts of direct matches plus children counts
-        const directCount = countMap.get(category.name) || 0;
-        const childrenCount = processedChildren.reduce((sum, child) => sum + (child.count || 0), 0);
-        const totalCount = directCount > 0 ? directCount : childrenCount;
+    const filterMap = new Map();
+    productFilters.forEach(filter => {
+      const colors = filter.colors.filter(c => c != null);
+      filterMap.set(filter._id, {
+        brands: filter.brands.filter(Boolean),
+        colors: colors,
+        priceRange: {
+          min: filter.minPrice || 0,
+          max: filter.maxPrice || 0
+        }
+      });
+    });
 
+    // Add images and filters to categories
+    const addImagesAndFilters = (categories) => {
+      return categories.map(category => {
+        const filters = filterMap.get(category.name) || { brands: [], colors: [], priceRange: { min: 0, max: 0 } };
         return {
           ...category,
-          count: totalCount,
           image: category.image || categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
-          children: processedChildren
+          filters: {
+            brands: filters.brands,
+            colors: filters.colors,
+            priceRange: filters.priceRange
+          },
+          children: category.children.length > 0 ? addImagesAndFilters(category.children) : []
         };
       });
     };
 
-    return processCategories(rootCategories);
+    return addImagesAndFilters(rootCategories);
   } catch (error) {
     console.error("Error fetching hierarchical categories:", error);
     return [];
@@ -387,10 +390,38 @@ const addRelatedProducts = async (product) => {
       }
     ]);
 
+    // Get approved reviews for this product
+    const reviews = await Review.find({ product: product._id, status: "approved" })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Calculate rating distribution
+    const ratingStats = await Review.aggregate([
+      { $match: { product: product._id, status: "approved" } },
+      {
+        $group: {
+          _id: "$rating",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } }
+    ]);
+
+    const ratingDistribution = {};
+    for (let i = 5; i >= 1; i--) {
+      ratingDistribution[i] = ratingStats.find(r => r._id === i)?.count || 0;
+    }
+
     return {
       ...product,
       randomCombo: randomComboProducts,
-      relatedProducts: relatedProducts
+      relatedProducts: relatedProducts,
+      reviews: reviews,
+      reviewStats: {
+        total: reviews.length,
+        ratingDistribution
+      }
     };
   } catch (error) {
     console.error('Error fetching related products:', error);
@@ -490,14 +521,20 @@ export const queryProducts = async (query = {}) => {
       sortObj = { price: -1 };
       break;
     case "rating":
+    case "avg-rating":
       sortObj = { rating: -1 };
       break;
+    case "popularity":
+      sortObj = { reviews: -1 };
+      break;
     case "newest":
+    case "latest":
       sortObj = { id: -1 };
       break;
     case "name":
       sortObj = { name: 1 };
       break;
+    case "relevance":
     default:
       // Default: sort by featured first, then rating
       sortObj = { rating: -1 };

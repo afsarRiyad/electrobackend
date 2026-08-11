@@ -514,6 +514,35 @@ export const Category = mongoose.model("Category", categorySchema);
 export const ProductAttribute = mongoose.model("ProductAttribute", productAttributeSchema);
 export const ProductVariant = mongoose.model("ProductVariant", productVariantSchema);
 
+// ─── REVIEW ─────────────────────────────────────────────────────────────────────
+const reviewSchema = new mongoose.Schema(
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    userName: { type: String, required: true },
+    userEmail: { type: String, required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    title: { type: String, required: true, trim: true },
+    comment: { type: String, required: true },
+    verified: { type: Boolean, default: false }, // Verified purchase
+    helpful: { type: Number, default: 0 }, // Number of users who found it helpful
+    images: [{ type: String }], // Cloudinary URLs for review images
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+    adminResponse: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+
+reviewSchema.index({ product: 1, status: 1 });
+reviewSchema.index({ user: 1 });
+reviewSchema.index({ rating: 1 });
+
+export const Review = mongoose.model("Review", reviewSchema);
+
 // ─── MESSAGE (INBOX) ─────────────────────────────────────────────────────────────
 const messageSchema = new mongoose.Schema(
   {
