@@ -3,6 +3,7 @@ import { Product } from "../utils/models.js";
 import {
   findProduct,
   getBrands,
+  getColors,
   getCategories,
   getHierarchicalCategories,
   getHomeV3Payload,
@@ -50,6 +51,10 @@ router.get("/categories/hierarchical", async (req, res) => {
 
 router.get("/brands", async (req, res) => {
   res.json({ data: await getBrands() });
+});
+
+router.get("/colors", async (req, res) => {
+  res.json({ data: await getColors() });
 });
 
 router.get("/home-v3", async (req, res) => {

@@ -135,6 +135,7 @@ app.get("/", (req, res) => {
       categories: "/api/categories",
       hierarchicalCategories: "/api/categories/hierarchical",
       brands: "/api/brands",
+      colors: "/api/colors",
       homeV3: "/api/home-v3",
       // Auth
       auth: {

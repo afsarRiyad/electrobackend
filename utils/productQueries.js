@@ -160,6 +160,7 @@ export const getBrands = async () => {
   
   try {
     const brands = await Product.aggregate([
+      { $match: { brand: { $ne: null, $exists: true, $ne: "" } } },
       { $group: { _id: "$brand", count: { $sum: 1 } } },
       { $project: { name: "$_id", count: 1, _id: 0 } },
       { $sort: { name: 1 } }
@@ -168,6 +169,38 @@ export const getBrands = async () => {
     return brands;
   } catch (error) {
     console.error("Error fetching brands:", error);
+    return [];
+  }
+};
+
+export const getColors = async () => {
+  try {
+    const attrColors = await Product.aggregate([
+      { $unwind: "$customAttributes" },
+      { $match: { "customAttributes.name": { $regex: /^color$/i } } },
+      { $group: { _id: "$customAttributes.value", count: { $sum: 1 } } },
+      { $project: { name: "$_id", count: 1, _id: 0 } },
+      { $sort: { name: 1 } }
+    ]);
+
+    if (attrColors.length > 0) return attrColors;
+
+    const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
+    const results = [];
+    for (const color of commonColors) {
+      const count = await Product.countDocuments({
+        $or: [
+          { name: { $regex: color, $options: "i" } },
+          { tags: { $regex: color, $options: "i" } }
+        ]
+      });
+      if (count > 0) {
+        results.push({ name: color, count });
+      }
+    }
+    return results;
+  } catch (error) {
+    console.error("Error fetching colors:", error);
     return [];
   }
 };
@@ -282,6 +315,7 @@ export const queryProducts = async (query = {}) => {
     search,
     category,
     brand,
+    color,
     tag,
     minPrice,
     maxPrice,
@@ -295,6 +329,7 @@ export const queryProducts = async (query = {}) => {
   const searchTerm = normalize(search);
   const categoryTerm = normalize(category);
   const brandTerm = normalize(brand);
+  const colorTerm = normalize(color);
   const tagTerm = normalize(tag);
   const min = Number(minPrice);
   const max = Number(maxPrice);
@@ -303,24 +338,39 @@ export const queryProducts = async (query = {}) => {
 
   const filter = {};
 
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   if (searchTerm) {
+    const safeSearch = escapeRegex(searchTerm);
     filter.$or = [
-      { name: { $regex: searchTerm, $options: "i" } },
-      { sku: { $regex: searchTerm, $options: "i" } },
-      { brand: { $regex: searchTerm, $options: "i" } },
-      { categories: { $regex: searchTerm, $options: "i" } },
-      { tags: { $regex: searchTerm, $options: "i" } }
+      { name: { $regex: safeSearch, $options: "i" } },
+      { sku: { $regex: safeSearch, $options: "i" } },
+      { brand: { $regex: safeSearch, $options: "i" } },
+      { categories: { $regex: safeSearch, $options: "i" } },
+      { tags: { $regex: safeSearch, $options: "i" } }
     ];
   }
 
   if (categoryTerm) {
     // Exact case-insensitive category match
-    filter.categories = { $regex: new RegExp(`^${categoryTerm}$`, "i") };
+    filter.categories = { $regex: new RegExp(`^${escapeRegex(categoryTerm)}$`, "i") };
   }
 
   if (brandTerm) {
-    // Exact case-insensitive brand match
-    filter.brand = { $regex: new RegExp(`^${brandTerm}$`, "i") };
+    const brandsList = brandTerm.split(',').map(b => b.trim()).filter(Boolean);
+    if (brandsList.length > 1) {
+      filter.brand = { $in: brandsList.map(b => new RegExp(`^${escapeRegex(b)}$`, "i")) };
+    } else {
+      filter.brand = { $regex: new RegExp(`^${escapeRegex(brandTerm)}$`, "i") };
+    }
+  }
+
+  if (colorTerm) {
+    filter.$or = [
+      { "customAttributes.value": { $regex: new RegExp(`^${escapeRegex(colorTerm)}$`, "i") } },
+      { name: { $regex: escapeRegex(colorTerm), $options: "i" } },
+      { tags: { $regex: escapeRegex(colorTerm), $options: "i" } }
+    ];
   }
 
   if (tagTerm) {
