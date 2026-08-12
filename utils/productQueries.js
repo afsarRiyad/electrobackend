@@ -56,14 +56,26 @@ export const getCategories = async () => {
       { $sort: { name: 1 } }
     ]);
     
+    // Get total product count for "View All Products"
+    const totalProducts = await Product.countDocuments({ isActive: { $ne: false } });
+    
     // Add images to categories
     const categoriesWithImages = categories.map(category => ({
       ...category,
       image: categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png"
     }));
     
-    cachedCategories = categoriesWithImages;
-    return categoriesWithImages;
+    // Add "View All Products" at the beginning
+    const viewAllProductsCategory = {
+      name: "View All Products",
+      count: totalProducts,
+      image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png"
+    };
+    
+    const categoriesWithViewAll = [viewAllProductsCategory, ...categoriesWithImages];
+    
+    cachedCategories = categoriesWithViewAll;
+    return categoriesWithViewAll;
   } catch (error) {
     console.error("Error fetching categories:", error);
     return [];
@@ -126,16 +138,17 @@ export const getHierarchicalCategories = async () => {
       .lean();
     const fallbackColorNames = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
 
-    // Build a map of category ID to filters.
+    // Build a map of category ID to filters and counts.
     const categoryFilterMap = new Map();
 
-    // Initialize all categories with empty filters
+    // Initialize all categories with empty filters and zero count
     categories.forEach(cat => {
       categoryFilterMap.set(cat._id.toString(), {
-        brands: new Set(),
-        colors: new Set(),
+        brands: new Map(),
+        colors: new Map(),
         minPrice: Infinity,
-        maxPrice: 0
+        maxPrice: 0,
+        count: 0
       });
     });
 
@@ -162,8 +175,10 @@ export const getHierarchicalCategories = async () => {
       matchedCategoryIds.forEach(catId => {
         const filters = categoryFilterMap.get(catId);
         if (filters) {
+          filters.count++;
           if (typeof product.brand === 'string' && product.brand.trim()) {
-            filters.brands.add(product.brand.trim());
+            const brand = product.brand.trim();
+            filters.brands.set(brand, (filters.brands.get(brand) || 0) + 1);
           }
           (product.customAttributes || []).forEach(attr => {
             const isColor = attr?.type === 'color' || /^color$/i.test(attr?.name || '');
@@ -171,14 +186,19 @@ export const getHierarchicalCategories = async () => {
 
             const colorValues = Array.isArray(attr.value) ? attr.value : [attr.value];
             colorValues.forEach(color => {
-              if (typeof color === 'string' && color.trim()) filters.colors.add(color.trim());
+              if (typeof color === 'string' && color.trim()) {
+                const colorName = color.trim();
+                filters.colors.set(colorName, (filters.colors.get(colorName) || 0) + 1);
+              }
             });
           });
           fallbackColorNames.forEach(color => {
             const colorPattern = new RegExp(`\\b${color}\\b`, 'i');
             const appearsInName = typeof product.name === 'string' && colorPattern.test(product.name);
             const appearsInTags = (product.tags || []).some(tag => typeof tag === 'string' && colorPattern.test(tag));
-            if (appearsInName || appearsInTags) filters.colors.add(color);
+            if (appearsInName || appearsInTags) {
+              filters.colors.set(color, (filters.colors.get(color) || 0) + 1);
+            }
           });
           if (product.price < filters.minPrice) filters.minPrice = product.price;
           if (product.price > filters.maxPrice) filters.maxPrice = product.price;
@@ -186,12 +206,13 @@ export const getHierarchicalCategories = async () => {
       });
     });
 
-    // Convert Sets to arrays and handle empty price ranges
+    // Convert Maps to arrays and handle empty price ranges
     const filterMap = new Map();
     categoryFilterMap.forEach((filters, catId) => {
       filterMap.set(catId, {
-        brands: Array.from(filters.brands),
-        colors: Array.from(filters.colors),
+        brands: filters.brands,
+        colors: filters.colors,
+        count: filters.count,
         priceRange: {
           min: filters.minPrice === Infinity ? null : filters.minPrice,
           max: filters.maxPrice
@@ -203,34 +224,30 @@ export const getHierarchicalCategories = async () => {
     const addImagesAndFilters = (categories) => {
       return categories.map(category => {
         // Get filters for current category by ID
-        const categoryFilters = filterMap.get(category._id.toString()) || { brands: [], colors: [], priceRange: { min: null, max: 0 } };
+        const categoryFilters = filterMap.get(category._id.toString()) || { 
+          brands: new Map(), 
+          colors: new Map(), 
+          count: 0,
+          priceRange: { min: null, max: 0 } 
+        };
 
         // Process children first to get their filters
         const processedChildren = category.children.length > 0 ? addImagesAndFilters(category.children) : [];
 
-        // Aggregate filters from all children
-        const aggregatedBrands = new Set(categoryFilters.brands);
-        const aggregatedColors = new Set(categoryFilters.colors);
+        // Parent categories were already populated from their descendants
+        // above, so aggregating their children here would double-count items.
         let minPrice = categoryFilters.priceRange.min;
         let maxPrice = categoryFilters.priceRange.max || 0;
-
-        processedChildren.forEach(child => {
-          if (child.filters) {
-            child.filters.brands.forEach(b => aggregatedBrands.add(b));
-            child.filters.colors.forEach(c => aggregatedColors.add(c));
-            if (child.filters.priceRange.min !== null && (minPrice === null || child.filters.priceRange.min < minPrice)) {
-              minPrice = child.filters.priceRange.min;
-            }
-            if (child.filters.priceRange.max > maxPrice) maxPrice = child.filters.priceRange.max;
-          }
-        });
 
         return {
           ...category,
           image: category.image || categoryImages[category.name] || "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+          count: categoryFilters.count,
           filters: {
-            brands: Array.from(aggregatedBrands),
-            colors: Array.from(aggregatedColors),
+            brands: Array.from(categoryFilters.brands, ([name, count]) => ({ name, count }))
+              .sort((a, b) => a.name.localeCompare(b.name)),
+            colors: Array.from(categoryFilters.colors, ([name, count]) => ({ name, count }))
+              .sort((a, b) => a.name.localeCompare(b.name)),
             priceRange: {
               min: minPrice === null ? 0 : minPrice,
               max: maxPrice
@@ -241,7 +258,68 @@ export const getHierarchicalCategories = async () => {
       });
     };
 
-    return addImagesAndFilters(rootCategories);
+    // Calculate total products and aggregate all filters for "View All Products"
+    const totalProducts = products.length;
+    const allBrands = new Map();
+    const allColors = new Map();
+    let globalMinPrice = Infinity;
+    let globalMaxPrice = 0;
+
+    products.forEach(product => {
+      if (typeof product.brand === 'string' && product.brand.trim()) {
+        const brand = product.brand.trim();
+        allBrands.set(brand, (allBrands.get(brand) || 0) + 1);
+      }
+      (product.customAttributes || []).forEach(attr => {
+        const isColor = attr?.type === 'color' || /^color$/i.test(attr?.name || '');
+        if (!isColor || attr.value === undefined || attr.value === null || attr.value === '') return;
+
+        const colorValues = Array.isArray(attr.value) ? attr.value : [attr.value];
+        colorValues.forEach(color => {
+          if (typeof color === 'string' && color.trim()) {
+            const colorName = color.trim();
+            allColors.set(colorName, (allColors.get(colorName) || 0) + 1);
+          }
+        });
+      });
+      fallbackColorNames.forEach(color => {
+        const colorPattern = new RegExp(`\\b${color}\\b`, 'i');
+        const appearsInName = typeof product.name === 'string' && colorPattern.test(product.name);
+        const appearsInTags = (product.tags || []).some(tag => typeof tag === 'string' && colorPattern.test(tag));
+        if (appearsInName || appearsInTags) {
+          allColors.set(color, (allColors.get(color) || 0) + 1);
+        }
+      });
+      if (product.price < globalMinPrice) globalMinPrice = product.price;
+      if (product.price > globalMaxPrice) globalMaxPrice = product.price;
+    });
+
+    // Add "View All Products" category at the top
+    const viewAllProductsCategory = {
+      _id: "view-all-products",
+      name: "View All Products",
+      slug: "view-all-products",
+      description: "View all products across all categories",
+      parent: null,
+      image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+      icon: null,
+      isActive: true,
+      displayOrder: 0,
+      count: totalProducts,
+      filters: {
+        brands: Array.from(allBrands, ([name, count]) => ({ name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        colors: Array.from(allColors, ([name, count]) => ({ name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        priceRange: {
+          min: globalMinPrice === Infinity ? 0 : globalMinPrice,
+          max: globalMaxPrice
+        }
+      },
+      children: []
+    };
+
+    return [viewAllProductsCategory, ...addImagesAndFilters(rootCategories)];
   } catch (error) {
     console.error("Error fetching hierarchical categories:", error);
     return [];

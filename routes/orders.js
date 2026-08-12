@@ -18,13 +18,14 @@ const router = Router();
 
 // ─── GET /api/orders/track/:orderNumber ─────────────────────────────────────
 // Public order tracking by order number (optionally with email for verification)
+// This route must come before /:id to avoid route conflicts
 router.get("/track/:orderNumber", asyncHandler(async (req, res) => {
   const { orderNumber } = req.params;
   const { email } = req.query;
 
   console.log('Tracking order:', orderNumber, 'with email:', email);
 
-  if (!orderNumber) {
+  if (!orderNumber || orderNumber.trim() === '' || orderNumber === 'track') {
     throw new ValidationError("Order number is required");
   }
 
