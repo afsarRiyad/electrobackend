@@ -621,11 +621,11 @@ export const queryProducts = async (query = {}) => {
   const min = Number(minPrice);
   const max = Number(maxPrice);
   const currentPage = Math.max(Number(page) || 1, 1);
-  const perPage = Math.min(Math.max(Number(limit) || 12, 1), 50);
+  const perPage = Math.min(Math.max(Number(limit) || 12, 1), 100);
 
-  const filter = {};
+  const filter = { isActive: { $ne: false } };
 
-  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\&');
 
   if (searchTerm) {
     const safeSearch = escapeRegex(searchTerm);
@@ -713,7 +713,7 @@ export const queryProducts = async (query = {}) => {
     const [total, data] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive")
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
@@ -753,12 +753,12 @@ export const getHomeV3Payload = async () => {
     // Fetch heroDeals, categories, and all section products in parallel
     const [heroDeals, categories, productsInDb] = await Promise.all([
       Product.find({ tags: "top-rated" })
-        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive")
         .limit(3)
         .lean(),
       getCategories(),
       Product.find({ id: { $in: allProductIds } })
-        .select("id name slug price regularPrice salePrice rating reviews stock image categories tags brand")
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive")
         .lean(),
     ]);
 
