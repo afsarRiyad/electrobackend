@@ -464,27 +464,41 @@ export const getColors = async (category = "") => {
   }
 };
 
-const buildCategoryPath = async (category) => {
-  if (!category) return [];
-  
-  const path = [];
-  let currentCategory = category;
-  
-  while (currentCategory) {
-    path.unshift({
-      _id: currentCategory._id,
-      name: currentCategory.name,
-      slug: currentCategory.slug
-    });
+const buildCategoryPath = async (category, categoryNames = []) => {
+  // If category reference exists, use it
+  if (category) {
+    const path = [];
+    let currentCategory = category;
     
-    if (currentCategory.parent) {
-      currentCategory = await Category.findById(currentCategory.parent).lean();
-    } else {
-      currentCategory = null;
+    while (currentCategory) {
+      path.unshift({
+        _id: currentCategory._id,
+        name: currentCategory.name,
+        slug: currentCategory.slug
+      });
+      
+      if (currentCategory.parent) {
+        currentCategory = await Category.findById(currentCategory.parent).lean();
+      } else {
+        currentCategory = null;
+      }
+    }
+    
+    return path;
+  }
+  
+  // Fallback: try to find category from category names array
+  if (categoryNames && categoryNames.length > 0) {
+    // Use the last category name (most specific)
+    const categoryName = categoryNames[categoryNames.length - 1];
+    const foundCategory = await Category.findOne({ name: categoryName }).lean();
+    
+    if (foundCategory) {
+      return buildCategoryPath(foundCategory);
     }
   }
   
-  return path;
+  return [];
 };
 
 export const findProduct = async (idOrSlug) => {
@@ -499,7 +513,7 @@ export const findProduct = async (idOrSlug) => {
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
       product = await Product.findById(idOrSlug).populate('category').lean();
       if (product) {
-        product.breadcrumbs = await buildCategoryPath(product.category);
+        product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
         return await addRelatedProducts(product);
       }
     }
@@ -509,7 +523,7 @@ export const findProduct = async (idOrSlug) => {
     if (!isNaN(numericId)) {
       product = await Product.findOne({ id: numericId }).populate('category').lean();
       if (product) {
-        product.breadcrumbs = await buildCategoryPath(product.category);
+        product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
         return await addRelatedProducts(product);
       }
     }
@@ -517,7 +531,7 @@ export const findProduct = async (idOrSlug) => {
     // 3. Fallback to slug match
     product = await Product.findOne({ slug: normalized.toLowerCase() }).populate('category').lean();
     if (product) {
-      product.breadcrumbs = await buildCategoryPath(product.category);
+      product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
       return await addRelatedProducts(product);
     }
     
@@ -755,7 +769,7 @@ export const queryProducts = async (query = {}) => {
 
     // Add breadcrumbs to each product
     for (const product of data) {
-      product.breadcrumbs = await buildCategoryPath(product.category);
+      product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
     }
 
     return {
