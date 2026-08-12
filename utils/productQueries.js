@@ -464,6 +464,29 @@ export const getColors = async (category = "") => {
   }
 };
 
+const buildCategoryPath = async (category) => {
+  if (!category) return [];
+  
+  const path = [];
+  let currentCategory = category;
+  
+  while (currentCategory) {
+    path.unshift({
+      _id: currentCategory._id,
+      name: currentCategory.name,
+      slug: currentCategory.slug
+    });
+    
+    if (currentCategory.parent) {
+      currentCategory = await Category.findById(currentCategory.parent).lean();
+    } else {
+      currentCategory = null;
+    }
+  }
+  
+  return path;
+};
+
 export const findProduct = async (idOrSlug) => {
   if (!idOrSlug) return null;
   
@@ -474,20 +497,29 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      product = await Product.findById(idOrSlug).lean();
-      if (product) return await addRelatedProducts(product);
+      product = await Product.findById(idOrSlug).populate('category').lean();
+      if (product) {
+        product.breadcrumbs = await buildCategoryPath(product.category);
+        return await addRelatedProducts(product);
+      }
     }
 
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      product = await Product.findOne({ id: numericId }).lean();
-      if (product) return await addRelatedProducts(product);
+      product = await Product.findOne({ id: numericId }).populate('category').lean();
+      if (product) {
+        product.breadcrumbs = await buildCategoryPath(product.category);
+        return await addRelatedProducts(product);
+      }
     }
     
     // 3. Fallback to slug match
-    product = await Product.findOne({ slug: normalized.toLowerCase() }).lean();
-    if (product) return await addRelatedProducts(product);
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).populate('category').lean();
+    if (product) {
+      product.breadcrumbs = await buildCategoryPath(product.category);
+      return await addRelatedProducts(product);
+    }
     
     return null;
   } catch (error) {
@@ -714,11 +746,17 @@ export const queryProducts = async (query = {}) => {
       Product.countDocuments(filter),
       Product.find(filter)
         .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive")
+        .populate('category')
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
         .lean()
     ]);
+
+    // Add breadcrumbs to each product
+    for (const product of data) {
+      product.breadcrumbs = await buildCategoryPath(product.category);
+    }
 
     return {
       data,
