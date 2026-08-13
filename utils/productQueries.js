@@ -6,10 +6,16 @@ const normalize = (value = "") => value.toString().trim().toLowerCase();
 
 let cachedCategories = null;
 let cachedBrands = null;
+let cachedHierarchicalCategories = null;
+let hierarchicalCategoriesCacheTime = null;
+let categoryPathCache = new Map();
 
 export const clearProductCache = () => {
   cachedCategories = null;
   cachedBrands = null;
+  cachedHierarchicalCategories = null;
+  hierarchicalCategoriesCacheTime = null;
+  categoryPathCache.clear();
 };
 
 // Category image mapping
@@ -83,6 +89,15 @@ export const getCategories = async () => {
 };
 
 export const getHierarchicalCategories = async () => {
+  // Cache for 5 minutes
+  const CACHE_DURATION = 5 * 60 * 1000;
+  const now = Date.now();
+  
+  if (cachedHierarchicalCategories && hierarchicalCategoriesCacheTime && 
+      (now - hierarchicalCategoriesCacheTime) < CACHE_DURATION) {
+    return cachedHierarchicalCategories;
+  }
+  
   try {
     const categories = await Category.find({ isActive: true })
       .populate('parent', 'name slug')
@@ -133,9 +148,22 @@ export const getHierarchicalCategories = async () => {
 
     // Older product records predate the `isActive` field. They are active
     // unless explicitly disabled, so excluding only `false` preserves them.
-    const products = await Product.find({ isActive: { $ne: false } })
-      .select('name categories category tags brand customAttributes price')
-      .lean();
+    // OPTIMIZATION: Use aggregation instead of fetching all products
+    const productAggregation = await Product.aggregate([
+      { $match: { isActive: { $ne: false } } },
+      {
+        $project: {
+          name: 1,
+          categories: 1,
+          category: 1,
+          tags: 1,
+          brand: 1,
+          customAttributes: 1,
+          price: 1
+        }
+      }
+    ]);
+    const products = productAggregation;
     const fallbackColorNames = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
 
     // Build a map of category ID to filters and counts.
@@ -319,7 +347,13 @@ export const getHierarchicalCategories = async () => {
       children: []
     };
 
-    return [viewAllProductsCategory, ...addImagesAndFilters(rootCategories)];
+    const result = [viewAllProductsCategory, ...addImagesAndFilters(rootCategories)];
+    
+    // Cache the result
+    cachedHierarchicalCategories = result;
+    hierarchicalCategoriesCacheTime = now;
+    
+    return result;
   } catch (error) {
     console.error("Error fetching hierarchical categories:", error);
     return [];
@@ -467,6 +501,13 @@ export const getColors = async (category = "") => {
 const buildCategoryPath = async (category, categoryNames = []) => {
   // If category reference exists, use it
   if (category) {
+    const cacheKey = category._id.toString();
+    
+    // Check cache first
+    if (categoryPathCache.has(cacheKey)) {
+      return categoryPathCache.get(cacheKey);
+    }
+    
     const path = [];
     let currentCategory = category;
     
@@ -484,6 +525,8 @@ const buildCategoryPath = async (category, categoryNames = []) => {
       }
     }
     
+    // Cache the result
+    categoryPathCache.set(cacheKey, path);
     return path;
   }
   
@@ -511,8 +554,12 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      product = await Product.findById(idOrSlug).populate('category').lean();
+      product = await Product.findById(idOrSlug).select('category').lean();
       if (product) {
+        // Fetch category separately only if needed
+        if (product.category) {
+          product.category = await Category.findById(product.category).lean();
+        }
         product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
         return await addRelatedProducts(product);
       }
@@ -521,16 +568,24 @@ export const findProduct = async (idOrSlug) => {
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      product = await Product.findOne({ id: numericId }).populate('category').lean();
+      product = await Product.findOne({ id: numericId }).select('category').lean();
       if (product) {
+        // Fetch category separately only if needed
+        if (product.category) {
+          product.category = await Category.findById(product.category).lean();
+        }
         product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
         return await addRelatedProducts(product);
       }
     }
     
     // 3. Fallback to slug match
-    product = await Product.findOne({ slug: normalized.toLowerCase() }).populate('category').lean();
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category').lean();
     if (product) {
+      // Fetch category separately only if needed
+      if (product.category) {
+        product.category = await Category.findById(product.category).lean();
+      }
       product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
       return await addRelatedProducts(product);
     }
@@ -759,17 +814,39 @@ export const queryProducts = async (query = {}) => {
     const [total, data] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive")
-        .populate('category')
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive category")
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
         .lean()
     ]);
 
-    // Add breadcrumbs to each product
+    // Collect all unique category IDs that need to be fetched
+    const categoryIds = new Set();
+    const categoryNames = new Set();
+    
     for (const product of data) {
-      product.breadcrumbs = await buildCategoryPath(product.category, product.categories);
+      if (product.category) {
+        categoryIds.add(product.category.toString());
+      }
+      (product.categories || []).forEach(cat => {
+        if (typeof cat === 'string') {
+          categoryNames.add(cat);
+        }
+      });
+    }
+
+    // Fetch all categories at once
+    const categoriesMap = new Map();
+    if (categoryIds.size > 0) {
+      const categories = await Category.find({ _id: { $in: Array.from(categoryIds) } }).lean();
+      categories.forEach(cat => categoriesMap.set(cat._id.toString(), cat));
+    }
+
+    // Add breadcrumbs to each product (optimized - no N+1 queries)
+    for (const product of data) {
+      const category = product.category ? categoriesMap.get(product.category.toString()) : null;
+      product.breadcrumbs = await buildCategoryPath(category, product.categories);
     }
 
     return {
