@@ -123,6 +123,7 @@ const productSchema = new mongoose.Schema(
     reviews: { type: Number, default: 0 },
     stock: { type: Number, default: 0 },
     image: { type: String, default: null },
+    images: { type: [String], default: [] },
     productUrl: { type: String, default: null },
     description: { type: String, default: null },
     isActive: { type: Boolean, default: true },

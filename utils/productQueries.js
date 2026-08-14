@@ -554,7 +554,7 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      product = await Product.findById(idOrSlug).select('category description specifications').lean();
+      product = await Product.findById(idOrSlug).select('category description specifications images').lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -568,7 +568,7 @@ export const findProduct = async (idOrSlug) => {
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      product = await Product.findOne({ id: numericId }).select('category description specifications').lean();
+      product = await Product.findOne({ id: numericId }).select('category description specifications images').lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -580,7 +580,7 @@ export const findProduct = async (idOrSlug) => {
     }
     
     // 3. Fallback to slug match
-    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category description specifications').lean();
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category description specifications images').lean();
     if (product) {
       // Fetch category separately only if needed
       if (product.category) {
@@ -840,7 +840,7 @@ export const queryProducts = async (query = {}) => {
     const [total, data] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive category specifications")
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image images productUrl description customAttributes metaTitle metaDescription metaKeywords isActive category specifications")
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)

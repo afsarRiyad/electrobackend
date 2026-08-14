@@ -14,6 +14,11 @@ export const products = [
     reviews: 12,
     stock: 18,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/WirelessSound-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/wireless-audio-system-multiroom-360/",
     description: "A multiroom wireless audio system for powerful home entertainment sound.",
   },
@@ -32,6 +37,11 @@ export const products = [
     reviews: 8,
     stock: 9,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-white-elitebook-revolve-810-g2/",
     description: "A flexible white EliteBook tablet built for mobile productivity.",
   },
@@ -50,6 +60,11 @@ export const products = [
     reviews: 16,
     stock: 27,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/purple-solo-2-wireless/",
     description: "Wireless purple headphones with a comfortable over-ear design.",
   },
@@ -68,6 +83,11 @@ export const products = [
     reviews: 21,
     stock: 6,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-red-elitebook-revolve-810-g2/",
     description: "A red EliteBook convertible tablet with ultrabook performance.",
   },
@@ -86,6 +106,11 @@ export const products = [
     reviews: 10,
     stock: 22,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/white-solo-2-wireless/",
     description: "Clean white wireless headphones for everyday music and calls.",
   },
@@ -104,6 +129,11 @@ export const products = [
     reviews: 34,
     stock: 15,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/GoldPhone-1-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/GoldPhone-1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redmi-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/smartphone-6s-32gb-lte-2/",
     description: "A 32GB LTE smartphone with a sharp display and reliable battery life.",
   },
