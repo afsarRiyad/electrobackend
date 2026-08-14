@@ -554,7 +554,7 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      product = await Product.findById(idOrSlug).select('category').lean();
+      product = await Product.findById(idOrSlug).select('category description specifications').lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -568,7 +568,7 @@ export const findProduct = async (idOrSlug) => {
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      product = await Product.findOne({ id: numericId }).select('category').lean();
+      product = await Product.findOne({ id: numericId }).select('category description specifications').lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -580,7 +580,7 @@ export const findProduct = async (idOrSlug) => {
     }
     
     // 3. Fallback to slug match
-    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category').lean();
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category description specifications').lean();
     if (product) {
       // Fetch category separately only if needed
       if (product.category) {
@@ -602,6 +602,31 @@ const addRelatedProducts = async (product) => {
     // Get random combo products (random selection from all products)
     const randomComboProducts = await Product.aggregate([
       { $match: { _id: { $ne: product._id } } },
+      { $sample: { size: 3 } },
+      {
+        $project: {
+          id: 1,
+          name: 1,
+          slug: 1,
+          price: 1,
+          regularPrice: 1,
+          salePrice: 1,
+          rating: 1,
+          reviews: 1,
+          stock: 1,
+          image: 1,
+          categories: 1,
+          tags: 1,
+          brand: 1,
+          description: 1,
+          specifications: 1
+        }
+      }
+    ]);
+
+    // Get 4 related products - use random selection for better variety
+    const relatedProducts = await Product.aggregate([
+      { $match: { _id: { $ne: product._id } } },
       { $sample: { size: 4 } },
       {
         $project: {
@@ -617,29 +642,25 @@ const addRelatedProducts = async (product) => {
           image: 1,
           categories: 1,
           tags: 1,
-          brand: 1
+          brand: 1,
+          description: 1,
+          specifications: 1
         }
       }
     ]);
 
-    // Get 4 related products based on category, brand, or similar price
-    const relatedProducts = await Product.aggregate([
+    // Get 5-10 more products from the same category
+    const moreProducts = await Product.aggregate([
       {
         $match: {
           _id: { $ne: product._id },
           $or: [
             { categories: { $in: product.categories || [] } },
-            { brand: product.brand },
-            {
-              price: {
-                $gte: Math.max(0, product.price - 50),
-                $lte: product.price + 50
-              }
-            }
+            { category: product.category }
           ]
         }
       },
-      { $sample: { size: 4 } },
+      { $sample: { size: 8 } },
       {
         $project: {
           id: 1,
@@ -654,7 +675,9 @@ const addRelatedProducts = async (product) => {
           image: 1,
           categories: 1,
           tags: 1,
-          brand: 1
+          brand: 1,
+          description: 1,
+          customAttributes: 1
         }
       }
     ]);
@@ -682,16 +705,19 @@ const addRelatedProducts = async (product) => {
       ratingDistribution[i] = ratingStats.find(r => r._id === i)?.count || 0;
     }
 
-    return {
+    const result = {
       ...product,
-      randomCombo: randomComboProducts,
-      relatedProducts: relatedProducts,
       reviews: reviews,
       reviewStats: {
         total: reviews.length,
         ratingDistribution
-      }
+      },
+      randomCombo: randomComboProducts,
+      relatedProducts: relatedProducts,
+      moreProducts: moreProducts
     };
+
+    return result;
   } catch (error) {
     console.error('Error fetching related products:', error);
     return product;
@@ -814,7 +840,7 @@ export const queryProducts = async (query = {}) => {
     const [total, data] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive category")
+        .select("id name slug sku brand categories tags price regularPrice salePrice rating reviews stock image productUrl description customAttributes metaTitle metaDescription metaKeywords isActive category specifications")
         .sort(sortObj)
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
