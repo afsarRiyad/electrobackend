@@ -554,7 +554,7 @@ export const findProduct = async (idOrSlug) => {
 
     // 1. Try matching by MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
-      product = await Product.findById(idOrSlug).select('category description specifications images').lean();
+      product = await Product.findById(idOrSlug).lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -568,7 +568,7 @@ export const findProduct = async (idOrSlug) => {
     // 2. Try matching by numeric product id or slug
     const numericId = Number(normalized);
     if (!isNaN(numericId)) {
-      product = await Product.findOne({ id: numericId }).select('category description specifications images').lean();
+      product = await Product.findOne({ id: numericId }).lean();
       if (product) {
         // Fetch category separately only if needed
         if (product.category) {
@@ -580,7 +580,7 @@ export const findProduct = async (idOrSlug) => {
     }
     
     // 3. Fallback to slug match
-    product = await Product.findOne({ slug: normalized.toLowerCase() }).select('category description specifications images').lean();
+    product = await Product.findOne({ slug: normalized.toLowerCase() }).lean();
     if (product) {
       // Fetch category separately only if needed
       if (product.category) {
@@ -597,87 +597,134 @@ export const findProduct = async (idOrSlug) => {
   }
 };
 
+const COMBO_PRODUCT_PROJECTION = {
+  id: 1,
+  name: 1,
+  slug: 1,
+  price: 1,
+  regularPrice: 1,
+  salePrice: 1,
+  rating: 1,
+  reviews: 1,
+  stock: 1,
+  image: 1,
+  categories: 1,
+  tags: 1,
+  brand: 1,
+  description: 1,
+};
+
+const getCategoryId = (item) => {
+  if (!item?.category) return null;
+  return item.category._id || item.category;
+};
+
+const toComboProduct = (item) => ({
+  _id: item._id,
+  id: item.id,
+  name: item.name,
+  slug: item.slug,
+  price: item.price,
+  regularPrice: item.regularPrice,
+  salePrice: item.salePrice,
+  rating: item.rating,
+  reviews: item.reviews,
+  stock: item.stock,
+  image: item.image,
+  categories: item.categories,
+  tags: item.tags,
+  brand: item.brand,
+  description: item.description,
+});
+
+const buildRelatedProductFilter = (anchor, excludeIds = []) => {
+  const exclude = [anchor._id, ...excludeIds].filter(Boolean);
+  const filter = {
+    _id: { $nin: exclude },
+    isActive: { $ne: false },
+  };
+
+  const orConditions = [];
+  if (anchor.categories?.length) {
+    orConditions.push({ categories: { $in: anchor.categories } });
+  }
+  if (anchor.brand) {
+    orConditions.push({ brand: anchor.brand });
+  }
+
+  const categoryId = getCategoryId(anchor);
+  if (categoryId) {
+    orConditions.push({ category: categoryId });
+  }
+
+  if (orConditions.length > 0) {
+    filter.$or = orConditions;
+  }
+
+  return filter;
+};
+
+const fetchRelatedProductsForCombo = async (anchor, excludeIds = [], limit = 2) => {
+  const relatedFilter = buildRelatedProductFilter(anchor, excludeIds);
+
+  let results = await Product.aggregate([
+    { $match: relatedFilter },
+    { $sort: { rating: -1, reviews: -1 } },
+    { $limit: limit },
+    { $project: COMBO_PRODUCT_PROJECTION },
+  ]);
+
+  if (results.length < limit) {
+    const fallback = await Product.aggregate([
+      {
+        $match: {
+          _id: { $nin: [anchor._id, ...excludeIds, ...results.map((item) => item._id)] },
+          isActive: { $ne: false },
+        },
+      },
+      { $sort: { rating: -1, reviews: -1 } },
+      { $limit: limit - results.length },
+      { $project: COMBO_PRODUCT_PROJECTION },
+    ]);
+    results = [...results, ...fallback];
+  }
+
+  return results;
+};
+
+const buildComboPack = async (anchor, excludeIds = []) => {
+  const addons = await fetchRelatedProductsForCombo(anchor, excludeIds, 2);
+  return [toComboProduct(anchor), ...addons.map(toComboProduct)];
+};
+
 const addRelatedProducts = async (product) => {
   try {
-    // Get random combo products (random selection from all products)
-    const randomComboProducts = await Product.aggregate([
-      { $match: { _id: { $ne: product._id } } },
-      { $sample: { size: 3 } },
-      {
-        $project: {
-          id: 1,
-          name: 1,
-          slug: 1,
-          price: 1,
-          regularPrice: 1,
-          salePrice: 1,
-          rating: 1,
-          reviews: 1,
-          stock: 1,
-          image: 1,
-          categories: 1,
-          tags: 1,
-          brand: 1,
-          description: 1,
-          specifications: 1
-        }
-      }
-    ]);
+    // ===== COMBO PACK (current product at index 0) =====
+    const randomCombo = await buildComboPack(product);
 
-    // Get 4 related products - use random selection for better variety
+    // ===== RELATED PRODUCTS =====
     const relatedProducts = await Product.aggregate([
-      { $match: { _id: { $ne: product._id } } },
+      { $match: { _id: { $ne: product._id }, isActive: { $ne: false } } },
       { $sample: { size: 4 } },
       {
         $project: {
-          id: 1,
-          name: 1,
-          slug: 1,
-          price: 1,
-          regularPrice: 1,
-          salePrice: 1,
-          rating: 1,
-          reviews: 1,
-          stock: 1,
-          image: 1,
-          categories: 1,
-          tags: 1,
-          brand: 1,
-          description: 1,
-          specifications: 1
+          id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
+          rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
+          brand: 1, description: 1, specifications: 1
         }
       }
     ]);
 
-    // Get 5-10 more products from the same category
+    // ===== MORE PRODUCTS =====
     const moreProducts = await Product.aggregate([
-      {
-        $match: {
-          _id: { $ne: product._id },
-          $or: [
-            { categories: { $in: product.categories || [] } },
-            { category: product.category }
-          ]
-        }
-      },
-      { $sample: { size: 8 } },
+      { $match: buildRelatedProductFilter(product) },
+      { $sort: { rating: -1, reviews: -1 } },
+      { $limit: 8 },
       {
         $project: {
-          id: 1,
-          name: 1,
-          slug: 1,
-          price: 1,
-          regularPrice: 1,
-          salePrice: 1,
-          rating: 1,
-          reviews: 1,
-          stock: 1,
-          image: 1,
-          categories: 1,
-          tags: 1,
-          brand: 1,
-          description: 1,
-          customAttributes: 1
+          id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
+          rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
+          brand: 1, description: 1, customAttributes: 1
         }
       }
     ]);
@@ -712,7 +759,7 @@ const addRelatedProducts = async (product) => {
         total: reviews.length,
         ratingDistribution
       },
-      randomCombo: randomComboProducts,
+      randomCombo,
       relatedProducts: relatedProducts,
       moreProducts: moreProducts
     };
