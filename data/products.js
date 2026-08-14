@@ -152,6 +152,11 @@ export const products = [
     reviews: 19,
     stock: 44,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/game-console-controller-usb-3-0-cable/",
     description: "A wired game controller bundle with USB 3.0 cable support.",
   },
@@ -170,6 +175,11 @@ export const products = [
     reviews: 7,
     stock: 11,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/aerocool-en52377-dead-silence-gaming-cube-case/",
     description: "A compact gaming cube case with quiet airflow-focused design.",
   },
@@ -188,6 +198,11 @@ export const products = [
     reviews: 13,
     stock: 32,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/powerbank-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/powerbank-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/powerbank-1130-mah-blue/",
     description: "A pocketable blue powerbank for backup charging on the go.",
   },
@@ -225,6 +240,11 @@ export const products = [
     reviews: 18,
     stock: 8,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redmi-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redmi-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/GoldPhone-1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/ultrabook-ux305ca-fc050t/",
     description: "A slim UX-series device listed in the Electro smartphone/tablet catalog.",
   },
@@ -243,6 +263,11 @@ export const products = [
     reviews: 9,
     stock: 36,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/universal-headphones-case-in-black/",
     description: "A black universal carrying case for headphones and cables.",
   },
@@ -261,6 +286,11 @@ export const products = [
     reviews: 5,
     stock: 51,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/headphones-usb-wires/",
     description: "Replacement USB wires for compatible headphones.",
   },
@@ -279,6 +309,11 @@ export const products = [
     reviews: 26,
     stock: 20,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/ultra-wireless-s50-headphones-s50-with-bluetooth/",
     description: "Bluetooth S50 wireless headphones with extended listening comfort.",
   },
@@ -297,6 +332,11 @@ export const products = [
     reviews: 11,
     stock: 10,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/redPhone-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-thin-elitebook-revolve-810-g6/",
     description: "A thin EliteBook tablet with a bright display and lightweight build.",
   },
@@ -315,6 +355,11 @@ export const products = [
     reviews: 14,
     stock: 7,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/printer-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/printer-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/full-color-laserjet-pro-m452dn/",
     description: "A full-color LaserJet printer for home office and small business printing.",
   },
@@ -333,6 +378,11 @@ export const products = [
     reviews: 6,
     stock: 13,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/camera2-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/camera2-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/videocamera-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/purple-nx-mini-f1-aparat-smart-nx/",
     description: "A compact purple smart camera for everyday photography.",
   },
@@ -351,6 +401,11 @@ export const products = [
     reviews: 31,
     stock: 5,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/apple-macbook-pro-mf841hn-a-13-inch-laptop/",
     description: "A 13-inch MacBook Pro-style laptop listing for premium portable work.",
   },
@@ -369,6 +424,11 @@ export const products = [
     reviews: 0,
     stock: 17,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/videocamera-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/videocamera-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/camera2-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/camera-c430w-4k-waterproof/",
     description: "A waterproof 4K camera made for travel and action recording.",
   },
@@ -387,6 +447,11 @@ export const products = [
     reviews: 15,
     stock: 12,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/videocamera-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/camera2-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/camera-c430w-4k-with-waterproof-cover/",
     description: "A 4K action camera bundle with waterproof protection cover.",
   },
@@ -405,6 +470,11 @@ export const products = [
     reviews: 18,
     stock: 9,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-white-elitebook-revolve-810-g2-2/",
     description: "A white tablet listing from the Electro smart devices catalog.",
   },
@@ -423,6 +493,11 @@ export const products = [
     reviews: 10,
     stock: 4,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/laptop-screener-cx70-2qf-621xpl-17-3-4210/",
     description: "A large-screen 17.3-inch laptop for work and entertainment.",
   },
@@ -441,6 +516,11 @@ export const products = [
     reviews: 16,
     stock: 11,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/notebook-widescreen-y700-17-gf790/",
     description: "A widescreen notebook for media, gaming, and daily productivity.",
   },
@@ -459,6 +539,11 @@ export const products = [
     reviews: 24,
     stock: 8,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/gameconsole-destiny-special-edition-2/",
     description: "A special edition gaming console for living-room entertainment.",
   },
@@ -477,6 +562,11 @@ export const products = [
     reviews: 13,
     stock: 28,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/whirelesscar-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/powerbank-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/wireless-charger-2040-white/",
     description: "A white wireless charger for compatible phones and accessories.",
   },
@@ -495,6 +585,11 @@ export const products = [
     reviews: 15,
     stock: 12,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+    images: [
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/tabsamg-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+      "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png"
+    ],
     productUrl: "https://electro.madrasthemes.com/product/smart-tv-4k-uhd-55-inch/",
     description: "A gorgeous 55-inch smart TV with stunning 4K UHD resolution."
   },
@@ -513,6 +608,7 @@ export const products = [
     reviews: 32,
     stock: 5,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/applap-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/oled-smart-tv-65-inch-thinq/",
     description: "Experience infinite contrast and deep blacks with this premium 65-inch OLED TV."
   },
@@ -531,6 +627,7 @@ export const products = [
     reviews: 20,
     stock: 8,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/asuaslap-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/qled-ultra-hd-smart-tv-50-inch/",
     description: "Vibrant QLED colors and smart hub features in a compact 50-inch frame."
   },
@@ -549,6 +646,7 @@ export const products = [
     reviews: 14,
     stock: 20,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/apptablet-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/crystal-uhd-smart-tv-43-inch/",
     description: "Clear and vivid 43-inch smart TV, perfect for bedrooms or smaller rooms."
   },
@@ -567,6 +665,7 @@ export const products = [
     reviews: 18,
     stock: 14,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/macpro-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/hisense-u7-mini-led-55-inch/",
     description: "ULED Mini-LED TV with smooth Google TV interface and gaming mode."
   },
@@ -585,6 +684,7 @@ export const products = [
     reviews: 24,
     stock: 9,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/Ultrabooks-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/tcl-q-class-4k-uhd-65-inch/",
     description: "High-contrast HDR QLED TV featuring immersive sound and Google TV."
   },
@@ -603,6 +703,7 @@ export const products = [
     reviews: 45,
     stock: 4,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/cam4k-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/sony-bravia-xr-oled-65-inch/",
     description: "Premium OLED panel powered by the Cognitive Processor XR."
   },
@@ -621,6 +722,7 @@ export const products = [
     reviews: 58,
     stock: 35,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/consal-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/apple-tv-4k-wi-fi-64gb/",
     description: "The ultimate streaming box with 4K Dolby Vision, HDR10+, and Siri Remote."
   },
@@ -639,6 +741,7 @@ export const products = [
     reviews: 42,
     stock: 40,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/game1-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/roku-ultra-streaming-device-4k/",
     description: "Our fastest and most powerful player with a hands-free voice remote."
   },
@@ -657,6 +760,7 @@ export const products = [
     reviews: 38,
     stock: 7,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/heade1-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/sonos-arc-smart-soundbar-dolby-atmos/",
     description: "Bring all your entertainment to life with the extraordinarily realistic sound of Arc."
   },
@@ -675,6 +779,7 @@ export const products = [
     reviews: 29,
     stock: 10,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/uniheadphone-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/bose-smart-soundbar-900-atmos/",
     description: "It is the most immersive Bose voice-controlled smart soundbar yet."
   },
@@ -693,6 +798,7 @@ export const products = [
     reviews: 16,
     stock: 6,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/1-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/sony-ht-a7000-dolby-atmos-soundbar/",
     description: "Discover a whole new level of immersion with surround sound engineered by Sony."
   },
@@ -711,6 +817,7 @@ export const products = [
     reviews: 0,
     stock: 3,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/usbheadphone-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/sennheiser-ambeo-soundbar-max-3d/",
     description: "The world's best cinematic soundbar from a single 3D audio home system."
   },
@@ -729,6 +836,7 @@ export const products = [
     reviews: 22,
     stock: 12,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/headphonecase-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/denon-avr-s760h-7-2-channel-receiver/",
     description: "Power your home theater with 75W per channel and 3 dedicated 8K HDMI inputs."
   },
@@ -747,6 +855,7 @@ export const products = [
     reviews: 64,
     stock: 18,
     image: "https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png",
+    images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/gamecabin-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/nvidia-shield-tv-pro-4k-hdr/",
     description: "The ultimate Android TV streaming media player for tech enthusiasts."
   }
