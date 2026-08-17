@@ -21,6 +21,12 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/wireless-audio-system-multiroom-360/",
     description: "A multiroom wireless audio system for powerful home entertainment sound.",
+    specifications: [
+      { name: "Power Output", value: "360", unit: "W" },
+      { name: "Frequency Response", value: "20Hz-20kHz" },
+      { name: "Connectivity", value: "Bluetooth 5.0, WiFi" },
+      { name: "Weight", value: "2.5", unit: "kg" }
+    ],
   },
   {
     id: 2606,
@@ -136,6 +142,16 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/smartphone-6s-32gb-lte-2/",
     description: "A 32GB LTE smartphone with a sharp display and reliable battery life.",
+    specifications: [
+      { name: "Display", value: "4.7", unit: "inches" },
+      { name: "Storage", value: "32", unit: "GB" },
+      { name: "RAM", value: "2", unit: "GB" },
+      { name: "Camera", value: "12", unit: "MP" },
+      { name: "Battery", value: "1715", unit: "mAh" },
+      { name: "Processor", value: "A9" },
+      { name: "Weight", value: "143", unit: "g" },
+      { name: "OS", value: "iOS 9" }
+    ],
   },
   {
     id: 2599,
@@ -159,6 +175,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/game-console-controller-usb-3-0-cable/",
     description: "A wired game controller bundle with USB 3.0 cable support.",
+    specifications: [
+      { name: "Connectivity", value: "USB 3.0" },
+      { name: "Cable Length", value: "2.0", unit: "m" },
+      { name: "Compatibility", value: "PC, Console" },
+      { name: "Weight", value: "250", unit: "g" },
+      { name: "Battery", value: "No", unit: "needed" }
+    ],
   },
   {
     id: 2619,
@@ -182,6 +205,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/aerocool-en52377-dead-silence-gaming-cube-case/",
     description: "A compact gaming cube case with quiet airflow-focused design.",
+    specifications: [
+      { name: "Form Factor", value: "Cube" },
+      { name: "Material", value: "Steel" },
+      { name: "Dimensions", value: "400x400x400", unit: "mm" },
+      { name: "Weight", value: "6.5", unit: "kg" },
+      { name: "Compatibility", value: "Micro-ATX, Mini-ITX" }
+    ],
   },
   {
     id: 2628,
@@ -205,6 +235,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/powerbank-1130-mah-blue/",
     description: "A pocketable blue powerbank for backup charging on the go.",
+    specifications: [
+      { name: "Capacity", value: "1130", unit: "mAh" },
+      { name: "Output", value: "10", unit: "W" },
+      { name: "Ports", value: "1 USB-A, 1 USB-C" },
+      { name: "Weight", value: "200", unit: "g" },
+      { name: "Input", value: "5V/2A" }
+    ],
   },
   {
     id: 2630,
@@ -224,6 +261,14 @@ export const products = [
     images: ["https://electro.madrasthemes.com/wp-content/uploads/2016/03/watch-300x300.png"],
     productUrl: "https://electro.madrasthemes.com/product/smartwatch-2-0-lte-wifi-waterproof-2/",
     description: "A waterproof LTE smartwatch with WiFi and daily fitness tracking.",
+    specifications: [
+      { name: "Display", value: "1.3", unit: "inches" },
+      { name: "Battery Life", value: "7", unit: "days" },
+      { name: "Water Resistance", value: "IP68" },
+      { name: "Connectivity", value: "LTE, WiFi, Bluetooth" },
+      { name: "Weight", value: "45", unit: "g" },
+      { name: "Health Sensors", value: "Heart Rate, SpO2, Sleep" }
+    ],
   },
   {
     id: 2637,
@@ -247,6 +292,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/ultrabook-ux305ca-fc050t/",
     description: "A slim UX-series device listed in the Electro smartphone/tablet catalog.",
+    specifications: [
+      { name: "Display", value: "13.3", unit: "inches" },
+      { name: "Processor", value: "Intel Core i5" },
+      { name: "RAM", value: "8", unit: "GB" },
+      { name: "Storage", value: "256", unit: "GB" },
+      { name: "Weight", value: "1.3", unit: "kg" },
+      { name: "Battery", value: "48", unit: "Wh" }
+    ],
   },
   {
     id: 2440,
@@ -270,6 +323,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/universal-headphones-case-in-black/",
     description: "A black universal carrying case for headphones and cables.",
+    specifications: [
+      { name: "Material", value: "Hard Plastic" },
+      { name: "Compatibility", value: "Universal" },
+      { name: "Weight", value: "50", unit: "g" },
+      { name: "Color", value: "Black" },
+      { name: "Protection", value: "Impact Resistant" }
+    ],
   },
   {
     id: 2441,
@@ -293,6 +353,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/headphones-usb-wires/",
     description: "Replacement USB wires for compatible headphones.",
+    specifications: [
+      { name: "Length", value: "1.5", unit: "m" },
+      { name: "Connector", value: "USB-C" },
+      { name: "Material", value: "Braided Nylon" },
+      { name: "Current", value: "2A", unit: "A" },
+      { name: "Compatibility", value: "Most Headphones" }
+    ],
   },
   {
     id: 2439,
@@ -316,6 +383,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/ultra-wireless-s50-headphones-s50-with-bluetooth/",
     description: "Bluetooth S50 wireless headphones with extended listening comfort.",
+    specifications: [
+      { name: "Type", value: "Wireless" },
+      { name: "Battery Life", value: "20", unit: "hours" },
+      { name: "Connectivity", value: "Bluetooth 5.0" },
+      { name: "Weight", value: "220", unit: "g" },
+      { name: "Frequency Response", value: "20Hz-20kHz" }
+    ],
   },
   {
     id: 2932,
@@ -339,6 +413,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-thin-elitebook-revolve-810-g6/",
     description: "A thin EliteBook tablet with a bright display and lightweight build.",
+    specifications: [
+      { name: "Display", value: "10.1", unit: "inches" },
+      { name: "Processor", value: "Intel Core i7" },
+      { name: "RAM", value: "16", unit: "GB" },
+      { name: "Storage", value: "512", unit: "GB" },
+      { name: "Weight", value: "0.9", unit: "kg" },
+      { name: "Battery", value: "35", unit: "Wh" }
+    ],
   },
   {
     id: 2621,
@@ -362,6 +444,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/full-color-laserjet-pro-m452dn/",
     description: "A full-color LaserJet printer for home office and small business printing.",
+    specifications: [
+      { name: "Print Speed", value: "28", unit: "ppm" },
+      { name: "Resolution", value: "1200x1200", unit: "dpi" },
+      { name: "Paper Size", value: "A4" },
+      { name: "Connectivity", value: "USB, WiFi, Ethernet" },
+      { name: "Weight", value: "12.5", unit: "kg" }
+    ],
   },
   {
     id: 2719,
@@ -385,6 +474,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/purple-nx-mini-f1-aparat-smart-nx/",
     description: "A compact purple smart camera for everyday photography.",
+    specifications: [
+      { name: "Sensor", value: "12", unit: "MP" },
+      { name: "Zoom", value: "3x" },
+      { name: "Video", value: "4K" },
+      { name: "Connectivity", value: "WiFi, Bluetooth" },
+      { name: "Weight", value: "180", unit: "g" }
+    ],
   },
   {
     id: 2860,
@@ -408,6 +504,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/apple-macbook-pro-mf841hn-a-13-inch-laptop/",
     description: "A 13-inch MacBook Pro-style laptop listing for premium portable work.",
+    specifications: [
+      { name: "Display", value: "13.3", unit: "inches" },
+      { name: "Processor", value: "M2" },
+      { name: "RAM", value: "16", unit: "GB" },
+      { name: "Storage", value: "512", unit: "GB" },
+      { name: "Weight", value: "1.4", unit: "kg" },
+      { name: "Battery", value: "52", unit: "Wh" }
+    ],
   },
   {
     id: 2713,
@@ -431,6 +535,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/camera-c430w-4k-waterproof/",
     description: "A waterproof 4K camera made for travel and action recording.",
+    specifications: [
+      { name: "Sensor", value: "16", unit: "MP" },
+      { name: "Video", value: "4K" },
+      { name: "Waterproof", value: "IP68" },
+      { name: "Weight", value: "120", unit: "g" },
+      { name: "Battery Life", value: "2", unit: "hours" }
+    ],
   },
   {
     id: 2702,
@@ -454,6 +565,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/camera-c430w-4k-with-waterproof-cover/",
     description: "A 4K action camera bundle with waterproof protection cover.",
+    specifications: [
+      { name: "Sensor", value: "16", unit: "MP" },
+      { name: "Video", value: "4K" },
+      { name: "Waterproof", value: "IP68" },
+      { name: "Weight", value: "135", unit: "g" },
+      { name: "Battery Life", value: "2.5", unit: "hours" }
+    ],
   },
   {
     id: 2684,
@@ -477,6 +595,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/tablet-white-elitebook-revolve-810-g2-2/",
     description: "A white tablet listing from the Electro smart devices catalog.",
+    specifications: [
+      { name: "Display", value: "10.1", unit: "inches" },
+      { name: "Processor", value: "Intel Core i5" },
+      { name: "RAM", value: "8", unit: "GB" },
+      { name: "Storage", value: "256", unit: "GB" },
+      { name: "Weight", value: "0.95", unit: "kg" },
+      { name: "Battery", value: "40", unit: "Wh" }
+    ],
   },
   {
     id: 2613,
@@ -500,6 +626,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/laptop-screener-cx70-2qf-621xpl-17-3-4210/",
     description: "A large-screen 17.3-inch laptop for work and entertainment.",
+    specifications: [
+      { name: "Display", value: "17.3", unit: "inches" },
+      { name: "Processor", value: "Intel Core i7" },
+      { name: "RAM", value: "16", unit: "GB" },
+      { name: "Storage", value: "1TB", unit: "SSD" },
+      { name: "Weight", value: "2.8", unit: "kg" },
+      { name: "Battery", value: "72", unit: "Wh" }
+    ],
   },
   {
     id: 2609,
@@ -523,6 +657,14 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/notebook-widescreen-y700-17-gf790/",
     description: "A widescreen notebook for media, gaming, and daily productivity.",
+    specifications: [
+      { name: "Display", value: "17.3", unit: "inches" },
+      { name: "Processor", value: "Intel Core i5" },
+      { name: "RAM", value: "8", unit: "GB" },
+      { name: "Storage", value: "512", unit: "GB" },
+      { name: "Weight", value: "2.5", unit: "kg" },
+      { name: "Battery", value: "45", unit: "Wh" }
+    ],
   },
   {
     id: 2715,
@@ -546,6 +688,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/gameconsole-destiny-special-edition-2/",
     description: "A special edition gaming console for living-room entertainment.",
+    specifications: [
+      { name: "Storage", value: "1TB", unit: "SSD" },
+      { name: "Graphics", value: "Ray Tracing" },
+      { name: "RAM", value: "16", unit: "GB" },
+      { name: "Resolution", value: "4K" },
+      { name: "Weight", value: "4.2", unit: "kg" }
+    ],
   },
   {
     id: 2635,
@@ -569,6 +718,13 @@ export const products = [
     ],
     productUrl: "https://electro.madrasthemes.com/product/wireless-charger-2040-white/",
     description: "A white wireless charger for compatible phones and accessories.",
+    specifications: [
+      { name: "Power", value: "20", unit: "W" },
+      { name: "Connector", value: "USB-C" },
+      { name: "Compatibility", value: "Qi Wireless" },
+      { name: "Weight", value: "120", unit: "g" },
+      { name: "Color", value: "White" }
+    ],
   },
   {
     id: 3001,
