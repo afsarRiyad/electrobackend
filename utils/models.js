@@ -129,7 +129,14 @@ const productSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     // Category reference (using Category model)
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
-    // Custom attributes for flexible product data
+    // Product specifications (optional - for products that need detailed specs)
+    specifications: [{
+      name: { type: String, required: true },
+      value: { type: mongoose.Schema.Types.Mixed, required: true },
+      unit: { type: String, default: null }, // e.g., "kg", "cm", "mm", "inches"
+      icon: { type: String, default: null }, // optional icon for spec item
+    }],
+    // Custom attributes for flexible product data (different from specifications)
     customAttributes: [{
       name: { type: String, required: true },
       value: { type: mongoose.Schema.Types.Mixed, required: true },
