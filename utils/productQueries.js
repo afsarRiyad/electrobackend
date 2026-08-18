@@ -148,7 +148,7 @@ export const getHierarchicalCategories = async () => {
 
     // Older product records predate the `isActive` field. They are active
     // unless explicitly disabled, so excluding only `false` preserves them.
-    // OPTIMIZATION: Use aggregation instead of fetching all products
+    // OPTIMIZATION: Use aggregation with only necessary fields
     const productAggregation = await Product.aggregate([
       { $match: { isActive: { $ne: false } } },
       {
@@ -161,7 +161,9 @@ export const getHierarchicalCategories = async () => {
           customAttributes: 1,
           price: 1
         }
-      }
+      },
+      // OPTIMIZATION: Limit to 500 products for filter building to improve performance
+      { $sample: { size: 500 } }
     ]);
     const products = productAggregation;
     const fallbackColorNames = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
@@ -440,30 +442,51 @@ export const getColors = async (category = "") => {
     if (attrColors.length > 0) return attrColors;
 
     const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
-    const results = [];
+    
+    // OPTIMIZATION: Use single aggregation instead of loop
+    const colorPatterns = commonColors.map(color => ({
+      name: color,
+      regex: new RegExp(`\\b${color}\\b`, 'i')
+    }));
 
-    // Try counting from database
-    for (const color of commonColors) {
-      const dbFilter = {
-        ...matchFilter,
-        $or: [
-          { name: { $regex: color, $options: "i" } },
-          { tags: { $regex: color, $options: "i" } }
-        ]
-      };
-      const count = await Product.countDocuments(dbFilter);
-      if (count > 0) {
-        results.push({ name: color, count });
-      }
-    }
+    const colorCounts = await Product.aggregate([
+      { $match: matchFilter },
+      { $project: {
+        name: 1,
+        tags: 1,
+        matchedColors: {
+          $filter: {
+            input: colorPatterns,
+            as: 'cp',
+            cond: {
+              $or: [
+                { $regexMatch: { input: "$name", regex: "$$cp.regex" } },
+                { $anyElementTrue: {
+                  $map: {
+                    input: "$tags",
+                    as: 'tag',
+                    in: { $regexMatch: { input: "$$tag", regex: "$$cp.regex" } }
+                  }
+                }}
+              ]
+            }
+          }
+        }
+      }},
+      { $unwind: "$matchedColors" },
+      { $group: { _id: "$matchedColors.name", count: { $sum: 1 } } },
+      { $project: { name: "$_id", count: 1, _id: 0 } },
+      { $sort: { name: 1 } }
+    ]);
 
-    if (results.length > 0) return results;
+    if (colorCounts.length > 0) return colorCounts;
 
     // Fallback from products dataset if DB is empty
     const filteredProducts = categoryTerm 
       ? products.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === categoryTerm))
       : products;
 
+    const results = [];
     for (const color of commonColors) {
       const count = filteredProducts.filter(p => 
         (p.name && p.name.toLowerCase().includes(color.toLowerCase())) ||
@@ -702,49 +725,49 @@ const addRelatedProducts = async (product) => {
     // ===== COMBO PACK (current product at index 0) =====
     const randomCombo = await buildComboPack(product);
 
-    // ===== RELATED PRODUCTS =====
-    const relatedProducts = await Product.aggregate([
-      { $match: { _id: { $ne: product._id }, isActive: { $ne: false } } },
-      { $sample: { size: 4 } },
-      {
-        $project: {
-          id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
-          rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
-          brand: 1, description: 1, specifications: 1
+    // ===== OPTIMIZATION: Run aggregations in parallel =====
+    const [relatedProducts, moreProducts, reviews, ratingStats] = await Promise.all([
+      // Related Products
+      Product.aggregate([
+        { $match: { _id: { $ne: product._id }, isActive: { $ne: false } } },
+        { $sample: { size: 4 } },
+        {
+          $project: {
+            id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
+            rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
+            brand: 1, description: 1, specifications: 1
+          }
         }
-      }
-    ]);
-
-    // ===== MORE PRODUCTS =====
-    const moreProducts = await Product.aggregate([
-      { $match: buildRelatedProductFilter(product) },
-      { $sort: { rating: -1, reviews: -1 } },
-      { $limit: 8 },
-      {
-        $project: {
-          id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
-          rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
-          brand: 1, description: 1, customAttributes: 1
+      ]),
+      // More Products
+      Product.aggregate([
+        { $match: buildRelatedProductFilter(product) },
+        { $sort: { rating: -1, reviews: -1 } },
+        { $limit: 8 },
+        {
+          $project: {
+            id: 1, name: 1, slug: 1, price: 1, regularPrice: 1, salePrice: 1,
+            rating: 1, reviews: 1, stock: 1, image: 1, categories: 1, tags: 1,
+            brand: 1, description: 1, customAttributes: 1
+          }
         }
-      }
-    ]);
-
-    // Get approved reviews for this product
-    const reviews = await Review.find({ product: product._id, status: "approved" })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // Calculate rating distribution
-    const ratingStats = await Review.aggregate([
-      { $match: { product: product._id, status: "approved" } },
-      {
-        $group: {
-          _id: "$rating",
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: -1 } }
+      ]),
+      // Reviews
+      Review.find({ product: product._id, status: "approved" })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      // Rating Stats
+      Review.aggregate([
+        { $match: { product: product._id, status: "approved" } },
+        {
+          $group: {
+            _id: "$rating",
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: -1 } }
+      ])
     ]);
 
     const ratingDistribution = {};

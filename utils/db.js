@@ -22,18 +22,23 @@ export const connectDB = async () => {
     
     console.log("MongoDB Connected successfully.");
 
-    // Sync products to database (upsert via bulkWrite) - always update to include new fields
-    console.log("Synchronizing products list with MongoDB...");
-    const bulkOps = products.map((productData) => ({
-      updateOne: {
-        filter: { id: productData.id },
-        update: { $set: productData },
-        upsert: true,
-      },
-    }));
-    await Product.bulkWrite(bulkOps);
-    clearProductCache();
-    console.log(`Successfully synchronized ${products.length} products to MongoDB.`);
+    // Sync products to database only if collection is empty
+    const productCount = await Product.countDocuments();
+    if (productCount === 0) {
+      console.log("Products collection is empty. Synchronizing products list with MongoDB...");
+      const bulkOps = products.map((productData) => ({
+        updateOne: {
+          filter: { id: productData.id },
+          update: { $set: productData },
+          upsert: true,
+        },
+      }));
+      await Product.bulkWrite(bulkOps);
+      clearProductCache();
+      console.log(`Successfully synchronized ${products.length} products to MongoDB.`);
+    } else {
+      console.log(`Products collection already has ${productCount} products. Skipping synchronization.`);
+    }
 
     // Sync categories to database if empty
     const { Category } = await import("./models.js");

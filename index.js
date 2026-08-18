@@ -304,7 +304,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // ─── Existing routes ──────────────────────────────────────────────────────────
-app.use("/api", generalLimiter, noCache, productRoutes);
+app.use("/api", generalLimiter, productCache, productRoutes);
 app.use("/api/auth", authLimiter, noCache, authRoutes);
 app.use("/api", generalLimiter, noCache, wishlistRoutes);
 app.use("/api", generalLimiter, noCache, compareRoutes);
