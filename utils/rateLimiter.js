@@ -9,7 +9,7 @@ const rateLimitMessage = (message) => ({
 // General API limiter - IP-based
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
+  max: 10000, // Increased to prevent 429 errors during development
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: ipKeyGenerator,
@@ -38,7 +38,7 @@ export const authLimiter = rateLimit({
 // Admin API limiter - IP-based
 export const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 2000,
+  max: 10000, // Increased to prevent 429 errors during development
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: ipKeyGenerator,

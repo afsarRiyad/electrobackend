@@ -72,13 +72,14 @@ const allowedOrigins = [
   process.env.ADMIN_URL, // Only the real dashboard domain
   process.env.CLIENT_URL, // Client frontend domain
   "https://tech-mart-six.vercel.app", // Vercel frontend
+  "https://*.vercel.app", // Allow all Vercel subdomains
 ].filter(Boolean);
 // Allow localhost for testing (can be disabled by setting ALLOW_LOCALHOST=false)
 const allowLocalhost = process.env.ALLOW_LOCALHOST !== "false";
 
 app.use(
   cors({
-    origin(origin, callback) {
+    origin: (origin, callback) => {
       // Allow requests with no Origin (Postman, mobile apps, server-to-server)
       if (!origin) return callback(null, true);
 
@@ -92,12 +93,22 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      // Allow all Vercel subdomains for production
+      if (origin.includes("vercel.app")) {
+        return callback(null, true);
+      }
+
+      // Development: allow all origins
+      if (isDevelopment) {
+        return callback(null, true);
+      }
+
+      // Reject all other origins
+      callback(new Error("Not allowed by CORS"));
     },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-XSRF-Token"],
-    maxAge: 86400, // Cache preflight requests for 24 hours
+    credentials: true, // Allow cookies and authorization headers
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   })
 );
 
