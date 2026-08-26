@@ -436,7 +436,12 @@ router.post("/refresh-token", async (req, res) => {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "No refresh token provided" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Please log in to continue"
+      });
     }
 
     // Verify refresh token
@@ -452,7 +457,12 @@ router.post("/refresh-token", async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid refresh token" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Session expired. Please log in again"
+      });
     }
 
     // Check if refresh token is expired
@@ -466,7 +476,12 @@ router.post("/refresh-token", async (req, res) => {
         (t) => t.token !== refreshToken
       );
       await user.save();
-      return res.status(401).json({ message: "Refresh token expired" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Session expired. Please log in again"
+      });
     }
 
     // Generate new access token
@@ -506,10 +521,20 @@ router.post("/refresh-token", async (req, res) => {
   } catch (error) {
     console.error("Refresh token error:", error);
     if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ message: "Invalid refresh token" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Session expired. Please log in again"
+      });
     }
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Refresh token expired" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Session expired. Please log in again"
+      });
     }
     return res.status(500).json({ message: "Server error during token refresh" });
   }

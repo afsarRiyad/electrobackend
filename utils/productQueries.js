@@ -6,13 +6,19 @@ const normalize = (value = "") => value.toString().trim().toLowerCase();
 
 let cachedCategories = null;
 let cachedBrands = null;
+let cachedBrandsByCategory = new Map(); // category -> { data, time }
+let cachedColorsByCategory = new Map(); // category -> { data, time }
 let cachedHierarchicalCategories = null;
 let hierarchicalCategoriesCacheTime = null;
 let categoryPathCache = new Map();
 
+const FILTER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export const clearProductCache = () => {
   cachedCategories = null;
   cachedBrands = null;
+  cachedBrandsByCategory.clear();
+  cachedColorsByCategory.clear();
   cachedHierarchicalCategories = null;
   hierarchicalCategoriesCacheTime = null;
   categoryPathCache.clear();
@@ -148,24 +154,13 @@ export const getHierarchicalCategories = async () => {
 
     // Older product records predate the `isActive` field. They are active
     // unless explicitly disabled, so excluding only `false` preserves them.
-    // OPTIMIZATION: Use aggregation with only necessary fields
-    const productAggregation = await Product.aggregate([
-      { $match: { isActive: { $ne: false } } },
-      {
-        $project: {
-          name: 1,
-          categories: 1,
-          category: 1,
-          tags: 1,
-          brand: 1,
-          customAttributes: 1,
-          price: 1
-        }
-      },
-      // OPTIMIZATION: Limit to 500 products for filter building to improve performance
-      { $sample: { size: 500 } }
-    ]);
-    const products = productAggregation;
+    // OPTIMIZATION: Fetch all active products with minimal fields.
+    // Using .find() with projection is faster than $sample aggregation
+    // which forces a full collection scan just to randomize.
+    const products = await Product.find(
+      { isActive: { $ne: false } },
+      { name: 1, categories: 1, category: 1, tags: 1, brand: 1, customAttributes: 1, price: 1 }
+    ).lean();
     const fallbackColorNames = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
 
     // Build a map of category ID to filters and counts.
@@ -366,6 +361,12 @@ export const getBrands = async (category = "") => {
   const categoryTerm = normalize(category);
   const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+  // OPTIMIZATION: Cache category-specific brand queries with TTL
+  if (categoryTerm) {
+    const cached = cachedBrandsByCategory.get(categoryTerm);
+    if (cached && (Date.now() - cached.time) < FILTER_CACHE_TTL) return cached.data;
+  }
+
   if (!categoryTerm && cachedBrands) return cachedBrands;
   
   try {
@@ -383,6 +384,7 @@ export const getBrands = async (category = "") => {
 
     if (brands && brands.length > 0) {
       if (!categoryTerm) cachedBrands = brands;
+      if (categoryTerm) cachedBrandsByCategory.set(categoryTerm, { data: brands, time: Date.now() });
       return brands;
     }
 
@@ -401,6 +403,8 @@ export const getBrands = async (category = "") => {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    if (categoryTerm) cachedBrandsByCategory.set(categoryTerm, { data: fallbackBrands, time: Date.now() });
+    else cachedBrands = fallbackBrands;
     return fallbackBrands;
   } catch (error) {
     console.error("Error fetching brands:", error);
@@ -424,6 +428,12 @@ export const getColors = async (category = "") => {
   const categoryTerm = normalize(category);
   const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+  // OPTIMIZATION: Cache category-specific color queries with TTL
+  if (categoryTerm) {
+    const cached = cachedColorsByCategory.get(categoryTerm);
+    if (cached && (Date.now() - cached.time) < FILTER_CACHE_TTL) return cached.data;
+  }
+
   try {
     const matchFilter = {};
     if (categoryTerm) {
@@ -439,7 +449,10 @@ export const getColors = async (category = "") => {
       { $sort: { name: 1 } }
     ]);
 
-    if (attrColors.length > 0) return attrColors;
+    if (attrColors.length > 0) {
+      if (categoryTerm) cachedColorsByCategory.set(categoryTerm, { data: attrColors, time: Date.now() });
+      return attrColors;
+    }
 
     const commonColors = ["Black", "White", "Red", "Blue", "Gold", "Purple", "Green", "Silver", "Gray"];
     
@@ -479,7 +492,10 @@ export const getColors = async (category = "") => {
       { $sort: { name: 1 } }
     ]);
 
-    if (colorCounts.length > 0) return colorCounts;
+    if (colorCounts.length > 0) {
+      if (categoryTerm) cachedColorsByCategory.set(categoryTerm, { data: colorCounts, time: Date.now() });
+      return colorCounts;
+    }
 
     // Fallback from products dataset if DB is empty
     const filteredProducts = categoryTerm 
@@ -498,6 +514,7 @@ export const getColors = async (category = "") => {
       }
     }
 
+    if (categoryTerm) cachedColorsByCategory.set(categoryTerm, { data: results, time: Date.now() });
     return results;
   } catch (error) {
     console.error("Error fetching colors:", error);
@@ -565,6 +582,21 @@ const buildCategoryPath = async (category, categoryNames = []) => {
   }
   
   return [];
+};
+
+// OPTIMIZATION: Build category path from an in-memory parent map (no DB queries)
+const buildCategoryPathFromMap = (categoryId, categoryMap, parentMap) => {
+  if (!categoryId) return [];
+  const id = categoryId.toString();
+  const path = [];
+  let currentId = id;
+  while (currentId) {
+    const cat = categoryMap.get(currentId);
+    if (!cat) break;
+    path.unshift({ _id: cat._id, name: cat.name, slug: cat.slug });
+    currentId = parentMap.get(currentId) || null;
+  }
+  return path;
 };
 
 export const findProduct = async (idOrSlug) => {
@@ -722,11 +754,10 @@ const buildComboPack = async (anchor, excludeIds = []) => {
 
 const addRelatedProducts = async (product) => {
   try {
-    // ===== COMBO PACK (current product at index 0) =====
-    const randomCombo = await buildComboPack(product);
-
-    // ===== OPTIMIZATION: Run aggregations in parallel =====
-    const [relatedProducts, moreProducts, reviews, ratingStats] = await Promise.all([
+    // ===== OPTIMIZATION: Run ALL queries in parallel including combo pack =====
+    const [randomCombo, relatedProducts, moreProducts, reviews, ratingStats] = await Promise.all([
+      // Combo Pack
+      buildComboPack(product),
       // Related Products
       Product.aggregate([
         { $match: { _id: { $ne: product._id }, isActive: { $ne: false } } },
@@ -939,10 +970,22 @@ export const queryProducts = async (query = {}) => {
       categories.forEach(cat => categoriesMap.set(cat._id.toString(), cat));
     }
 
-    // Add breadcrumbs to each product (optimized - no N+1 queries)
+    // OPTIMIZATION: Build a parent map and category map from fetched categories,
+    // then resolve all breadcrumbs in-memory with zero additional DB queries.
+    const parentMap = new Map();
+    const allCatMap = new Map();
+    if (categoryIds.size > 0) {
+      // Also fetch ancestor categories that may not be directly referenced by products
+      const allCatDocs = await Category.find({ isActive: true }).lean();
+      allCatDocs.forEach(cat => {
+        allCatMap.set(cat._id.toString(), cat);
+        parentMap.set(cat._id.toString(), cat.parent ? cat.parent.toString() : null);
+      });
+    }
+
     for (const product of data) {
-      const category = product.category ? categoriesMap.get(product.category.toString()) : null;
-      product.breadcrumbs = await buildCategoryPath(category, product.categories);
+      const catId = product.category ? product.category.toString() : null;
+      product.breadcrumbs = buildCategoryPathFromMap(catId, allCatMap, parentMap);
     }
 
     return {

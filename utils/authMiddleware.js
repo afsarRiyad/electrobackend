@@ -17,7 +17,12 @@ export const protect = async (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ message: "Not authorized, no token" });
+    return res.status(401).json({ 
+      success: false,
+      error: true,
+      requireAuth: true,
+      message: "Please log in to continue"
+    });
   }
 
   try {
@@ -28,7 +33,12 @@ export const protect = async (req, res, next) => {
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
-      return res.status(401).json({ message: "User not found, unauthorized" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        message: "Account not found. Please log in again"
+      });
     }
 
     req.user = user;
@@ -36,8 +46,19 @@ export const protect = async (req, res, next) => {
   } catch (error) {
     console.error("Auth middleware error:", error);
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Token expired" });
+      return res.status(401).json({ 
+        success: false,
+        error: true,
+        requireAuth: true,
+        tokenExpired: true,
+        message: "Session expired. Please log in again"
+      });
     }
-    return res.status(401).json({ message: "Not authorized, token failed" });
+    return res.status(401).json({ 
+      success: false,
+      error: true,
+      requireAuth: true,
+      message: "Invalid authentication. Please log in again"
+    });
   }
 };

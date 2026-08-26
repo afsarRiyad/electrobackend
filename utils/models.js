@@ -165,6 +165,10 @@ productSchema.index({ createdAt: -1 });
 productSchema.index({ isActive: 1, stock: 1 });
 productSchema.index({ categories: 1, isActive: 1 });
 productSchema.index({ brand: 1, isActive: 1 });
+// Additional compound indexes for filter/sort queries
+productSchema.index({ isActive: 1, categories: 1, brand: 1 });
+productSchema.index({ isActive: 1, price: 1 });
+productSchema.index({ isActive: 1, rating: -1 });
 
 // ─── WISHLIST ─────────────────────────────────────────────────────────────────
 const wishlistSchema = new mongoose.Schema(
