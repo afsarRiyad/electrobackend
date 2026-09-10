@@ -1,9 +1,23 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import { Cart, Product, ProductVariant } from "../utils/models.js";
-import { protect } from "../utils/authMiddleware.js";
+import { protectOptional, resolveOwner } from "../utils/authMiddleware.js";
 
 const router = Router();
+
+const requireOwner = (req, res) => {
+  const owner = resolveOwner(req);
+  if (!owner) {
+    res.status(401).json({
+      success: false,
+      error: true,
+      requireAuth: true,
+      message: "Please log in or continue as guest",
+    });
+    return null;
+  }
+  return owner;
+};
 
 const isPositiveInteger = (value) =>
   typeof value === "number" && Number.isInteger(value) && value >= 1;
@@ -89,9 +103,12 @@ const getVariant = async (variantId, productId) => {
 };
 
 // GET /api/cart
-router.get("/", protect, async (req, res) => {
+router.get("/", protectOptional, async (req, res) => {
   try {
-    let cart = await Cart.findOne({ user: req.user._id });
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
+    let cart = await Cart.findOne(owner);
     if (!cart) {
       return res.json({ data: formatCart({ items: [] }) });
     }
@@ -105,8 +122,11 @@ router.get("/", protect, async (req, res) => {
 });
 
 // POST /api/cart
-router.post("/", protect, async (req, res) => {
+router.post("/", protectOptional, async (req, res) => {
   try {
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
     const { product, quantity = 1, variant } = req.body;
 
     if (!mongoose.isObjectIdOrHexString(product)) {
@@ -136,9 +156,9 @@ router.post("/", protect, async (req, res) => {
       });
     }
 
-    let cart = await Cart.findOne({ user: req.user._id });
+    let cart = await Cart.findOne(owner);
     if (!cart) {
-      cart = await Cart.create({ user: req.user._id, items: [] });
+      cart = await Cart.create({ ...owner, items: [] });
     } else {
       cart = await ensureCartItemIds(cart);
     }
@@ -174,16 +194,19 @@ router.post("/", protect, async (req, res) => {
 });
 
 // PUT /api/cart/:itemId
-router.put("/:itemId", protect, async (req, res) => {
+router.put("/:itemId", protectOptional, async (req, res) => {
   try {
     if (!validateItemId(req.params.itemId, res)) return;
+
+    const owner = requireOwner(req, res);
+    if (!owner) return;
 
     const { quantity } = req.body;
     if (!isPositiveInteger(quantity)) {
       return res.status(400).json({ message: "Quantity must be a positive integer" });
     }
 
-    let cart = await Cart.findOne({ user: req.user._id });
+    let cart = await Cart.findOne(owner);
     if (!cart) {
       return res.status(404).json({ message: "Cart not found" });
     }
@@ -225,11 +248,14 @@ router.put("/:itemId", protect, async (req, res) => {
 });
 
 // DELETE /api/cart/:itemId
-router.delete("/:itemId", protect, async (req, res) => {
+router.delete("/:itemId", protectOptional, async (req, res) => {
   try {
     if (!validateItemId(req.params.itemId, res)) return;
 
-    let cart = await Cart.findOne({ user: req.user._id });
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
+    let cart = await Cart.findOne(owner);
     if (!cart) {
       return res.status(404).json({ message: "Cart not found" });
     }
@@ -254,9 +280,12 @@ router.delete("/:itemId", protect, async (req, res) => {
 });
 
 // DELETE /api/cart
-router.delete("/", protect, async (req, res) => {
+router.delete("/", protectOptional, async (req, res) => {
   try {
-    const cart = await Cart.findOne({ user: req.user._id });
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
+    const cart = await Cart.findOne(owner);
     if (!cart) {
       return res.status(404).json({ message: "Cart not found" });
     }

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { Product } from "./models.js";
+import { Cart, Compare, Product, Wishlist } from "./models.js";
 import { products } from "../data/products.js";
 import { clearProductCache } from "./productQueries.js";
 
@@ -21,6 +21,20 @@ export const connectDB = async () => {
     });
     
     console.log("MongoDB Connected successfully.");
+
+    // Align wishlist/compare/cart indexes with the current schema. This swaps
+    // the legacy user-only unique indexes for partial indexes that also allow
+    // guest sessions (guestId) to live in the same collections.
+    try {
+      await Promise.all([
+        Wishlist.syncIndexes(),
+        Compare.syncIndexes(),
+        Cart.syncIndexes(),
+      ]);
+      console.log("Wishlist/Compare/Cart indexes synced for guest support.");
+    } catch (indexError) {
+      console.warn("Index sync for guest support skipped:", indexError.message);
+    }
 
     // Sync products to database only if collection is empty
     const productCount = await Product.countDocuments();

@@ -171,24 +171,43 @@ productSchema.index({ isActive: 1, price: 1 });
 productSchema.index({ isActive: 1, rating: -1 });
 
 // ─── WISHLIST ─────────────────────────────────────────────────────────────────
+// Each entry belongs to either a logged-in `user` or a `guestId` session.
 const wishlistSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    guestId: { type: String, default: null },
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   },
   { timestamps: true }
 );
-wishlistSchema.index({ user: 1, product: 1 }, { unique: true });
+// Partial indexes let both uniqueness rules live on one collection: one entry per
+// product per user, and one entry per product per guest session.
+wishlistSchema.index(
+  { user: 1, product: 1 },
+  { unique: true, partialFilterExpression: { user: { $type: "objectId" } } }
+);
+wishlistSchema.index(
+  { guestId: 1, product: 1 },
+  { unique: true, partialFilterExpression: { guestId: { $type: "string" } } }
+);
 
 // ─── COMPARE ──────────────────────────────────────────────────────────────────
 const compareSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    guestId: { type: String, default: null },
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   },
   { timestamps: true }
 );
-compareSchema.index({ user: 1, product: 1 }, { unique: true });
+compareSchema.index(
+  { user: 1, product: 1 },
+  { unique: true, partialFilterExpression: { user: { $type: "objectId" } } }
+);
+compareSchema.index(
+  { guestId: 1, product: 1 },
+  { unique: true, partialFilterExpression: { guestId: { $type: "string" } } }
+);
 
 // ─── CART ────────────────────────────────────────────────────────────────────
 const cartItemSchema = new mongoose.Schema(
@@ -201,12 +220,20 @@ const cartItemSchema = new mongoose.Schema(
 
 const cartSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    guestId: { type: String, default: null },
     items: { type: [cartItemSchema], default: [] },
   },
   { timestamps: true }
 );
-cartSchema.index({ user: 1 });
+cartSchema.index(
+  { user: 1 },
+  { unique: true, partialFilterExpression: { user: { $type: "objectId" } } }
+);
+cartSchema.index(
+  { guestId: 1 },
+  { unique: true, partialFilterExpression: { guestId: { $type: "string" } } }
+);
 
 // ─── CUSTOMER ─────────────────────────────────────────────────────────────────
 const customerSchema = new mongoose.Schema(

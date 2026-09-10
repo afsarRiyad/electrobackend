@@ -1,16 +1,33 @@
 import { Router } from "express";
 import { Compare, Product } from "../utils/models.js";
-import { protect } from "../utils/authMiddleware.js";
+import { protectOptional, resolveOwner } from "../utils/authMiddleware.js";
 import mongoose from "mongoose";
 
 const router = Router();
 
-// @desc    Get user's compare list
+const requireOwner = (req, res) => {
+  const owner = resolveOwner(req);
+  if (!owner) {
+    res.status(401).json({
+      success: false,
+      error: true,
+      requireAuth: true,
+      message: "Please log in or continue as guest",
+    });
+    return null;
+  }
+  return owner;
+};
+
+// @desc    Get compare list (user or guest session)
 // @route   GET /api/compare
-// @access  Private
-router.get("/compare", protect, async (req, res) => {
+// @access  Private or guest
+router.get("/compare", protectOptional, async (req, res) => {
   try {
-    const compareItems = await Compare.find({ user: req.user._id })
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
+    const compareItems = await Compare.find(owner)
       .populate("product")
       .sort({ createdAt: -1 });
 
@@ -23,11 +40,14 @@ router.get("/compare", protect, async (req, res) => {
   }
 });
 
-// @desc    Add product to compare list
+// @desc    Add product to compare list (user or guest session)
 // @route   POST /api/compare
-// @access  Private
-router.post("/compare", protect, async (req, res) => {
+// @access  Private or guest
+router.post("/compare", protectOptional, async (req, res) => {
   try {
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
     const { productId } = req.body;
 
     if (!productId) {
@@ -52,7 +72,7 @@ router.post("/compare", protect, async (req, res) => {
 
     // Check if already in compare list
     const exists = await Compare.findOne({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 
@@ -62,7 +82,7 @@ router.post("/compare", protect, async (req, res) => {
 
     // Add to compare list
     await Compare.create({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 
@@ -73,11 +93,14 @@ router.post("/compare", protect, async (req, res) => {
   }
 });
 
-// @desc    Remove product from compare list
+// @desc    Remove product from compare list (user or guest session)
 // @route   DELETE /api/compare/:productId
-// @access  Private
-router.delete("/compare/:productId", protect, async (req, res) => {
+// @access  Private or guest
+router.delete("/compare/:productId", protectOptional, async (req, res) => {
   try {
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
     const { productId } = req.params;
 
     let product;
@@ -97,7 +120,7 @@ router.delete("/compare/:productId", protect, async (req, res) => {
     }
 
     const result = await Compare.findOneAndDelete({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 

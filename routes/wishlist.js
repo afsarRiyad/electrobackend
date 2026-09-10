@@ -1,16 +1,33 @@
 import { Router } from "express";
 import { Wishlist, Product } from "../utils/models.js";
-import { protect } from "../utils/authMiddleware.js";
+import { protectOptional, resolveOwner } from "../utils/authMiddleware.js";
 import mongoose from "mongoose";
 
 const router = Router();
 
-// @desc    Get user's wishlist
+const requireOwner = (req, res) => {
+  const owner = resolveOwner(req);
+  if (!owner) {
+    res.status(401).json({
+      success: false,
+      error: true,
+      requireAuth: true,
+      message: "Please log in or continue as guest",
+    });
+    return null;
+  }
+  return owner;
+};
+
+// @desc    Get wishlist (user or guest session)
 // @route   GET /api/wishlist
-// @access  Private
-router.get("/wishlist", protect, async (req, res) => {
+// @access  Private or guest
+router.get("/wishlist", protectOptional, async (req, res) => {
   try {
-    const wishlistItems = await Wishlist.find({ user: req.user._id })
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
+    const wishlistItems = await Wishlist.find(owner)
       .populate("product")
       .sort({ createdAt: -1 });
 
@@ -24,11 +41,14 @@ router.get("/wishlist", protect, async (req, res) => {
   }
 });
 
-// @desc    Add product to wishlist
+// @desc    Add product to wishlist (user or guest session)
 // @route   POST /api/wishlist
-// @access  Private
-router.post("/wishlist", protect, async (req, res) => {
+// @access  Private or guest
+router.post("/wishlist", protectOptional, async (req, res) => {
   try {
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
     const { productId } = req.body;
 
     if (!productId) {
@@ -55,7 +75,7 @@ router.post("/wishlist", protect, async (req, res) => {
 
     // Check if already in wishlist
     const exists = await Wishlist.findOne({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 
@@ -65,7 +85,7 @@ router.post("/wishlist", protect, async (req, res) => {
 
     // Add to wishlist
     await Wishlist.create({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 
@@ -76,11 +96,14 @@ router.post("/wishlist", protect, async (req, res) => {
   }
 });
 
-// @desc    Remove product from wishlist
+// @desc    Remove product from wishlist (user or guest session)
 // @route   DELETE /api/wishlist/:productId
-// @access  Private
-router.delete("/wishlist/:productId", protect, async (req, res) => {
+// @access  Private or guest
+router.delete("/wishlist/:productId", protectOptional, async (req, res) => {
   try {
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+
     const { productId } = req.params;
 
     // Find the product first to get its mongo _id
@@ -101,7 +124,7 @@ router.delete("/wishlist/:productId", protect, async (req, res) => {
     }
 
     const result = await Wishlist.findOneAndDelete({
-      user: req.user._id,
+      ...owner,
       product: product._id,
     });
 

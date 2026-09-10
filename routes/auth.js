@@ -9,6 +9,7 @@ import { validateSignup, validateLogin } from "../utils/validation.js";
 import { passport, generateToken as oauthGenerateToken } from "../utils/oauth.js";
 import { generateOTP, validateOTP, generateOTPExpiry } from "../utils/otp.js";
 import { createWelcomeCouponForUser } from "../utils/couponGenerator.js";
+import { mergeGuestData } from "../utils/guestData.js";
 
 const router = Router();
 
@@ -170,7 +171,7 @@ router.post("/signup", validateSignup, async (req, res) => {
 
   try {
     console.log('Signup request received:', req.body);
-    const { username, email, password } = req.body || {};
+    const { username, email, password, guestId } = req.body || {};
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Please fill all fields" });
@@ -267,6 +268,13 @@ router.post("/signup", validateSignup, async (req, res) => {
         path: "/",
       });
 
+      // Transfer the guest's cart, wishlist, and compare list into the new account.
+      if (guestId) {
+        await mergeGuestData(user._id, guestId).catch((err) => {
+          console.error("Failed to merge guest data at signup:", err);
+        });
+      }
+
       return res.status(201).json({
         success: true,
         error: false,
@@ -308,7 +316,7 @@ router.post("/signup", validateSignup, async (req, res) => {
 // @access  Public
 router.post("/login", validateLogin, async (req, res) => {
   try {
-    const { username, password } = req.body || {}; // username can be email or username (userhandle)
+    const { username, password, guestId } = req.body || {}; // username can be email or username (userhandle)
 
     if (!username || !password) {
       return res.status(400).json({ message: "Please enter username/email and password" });
@@ -363,6 +371,13 @@ router.post("/login", validateLogin, async (req, res) => {
       path: "/",
     });
 
+    // Transfer the guest's cart, wishlist, and compare list into the account.
+    if (guestId) {
+      await mergeGuestData(user._id, guestId).catch((err) => {
+        console.error("Failed to merge guest data at login:", err);
+      });
+    }
+
     return res.json({
       success: true,
       error: false,
@@ -378,6 +393,30 @@ router.post("/login", validateLogin, async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Server error during login" });
+  }
+});
+
+// @desc    Merge guest data (cart, wishlist, compare) into the logged-in account
+// @route   POST /api/auth/merge-guest-data
+// @access  Private (use after OAuth logins, where the guest id can't ride along)
+router.post("/merge-guest-data", protect, async (req, res) => {
+  try {
+    const { guestId } = req.body || {};
+
+    if (!guestId) {
+      return res.status(400).json({ message: "guestId is required" });
+    }
+
+    const result = await mergeGuestData(req.user._id, guestId);
+    return res.json({
+      success: true,
+      error: false,
+      message: "Guest data merged successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Merge guest data error:", error);
+    return res.status(500).json({ message: "Server error merging guest data" });
   }
 });
 
@@ -847,13 +886,28 @@ router.post("/verify-otp/me", protect, async (req, res) => {
 });
 
 // ─── Google OAuth Routes ───────────────────────────────────────────────────────
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+// The guest session id is carried through OAuth as the `state` parameter so the
+// guest cart/wishlist/compare list can be merged after the redirect.
+router.get("/google", (req, res, next) => {
+  const guestId = req.query.guestId;
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: guestId || undefined,
+  })(req, res, next);
+});
 
 router.get(
   "/google/callback",
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
-  (req, res) => {
+  async (req, res) => {
     try {
+      const guestId = req.query.state;
+      if (guestId) {
+        await mergeGuestData(req.user._id, guestId).catch((err) => {
+          console.error("Failed to merge guest data in Google callback:", err);
+        });
+      }
+
       const token = oauthGenerateToken(req.user._id);
       const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
       res.redirect(`${clientUrl}/auth/callback?token=${token}`);
@@ -865,14 +919,32 @@ router.get(
 );
 
 // ─── Apple OAuth Routes ─────────────────────────────────────────────────────────
-router.get("/apple", passport.authenticate("apple", { scope: ["email", "name"] }));
+router.get("/apple", (req, res, next) => {
+  const guestId = req.query.guestId;
+  passport.authenticate("apple", {
+    scope: ["email", "name"],
+    state: guestId || undefined,
+  })(req, res, next);
+});
 
 router.post(
   "/apple/callback",
   passport.authenticate("apple", { failureRedirect: "/login", session: false }),
-  (req, res) => {
-    const token = oauthGenerateToken(req.user._id);
-    res.json({ token, user: req.user });
+  async (req, res) => {
+    try {
+      const guestId = req.body?.state;
+      if (guestId) {
+        await mergeGuestData(req.user._id, guestId).catch((err) => {
+          console.error("Failed to merge guest data in Apple callback:", err);
+        });
+      }
+
+      const token = oauthGenerateToken(req.user._id);
+      res.json({ token, user: req.user });
+    } catch (error) {
+      console.error("Apple callback error:", error);
+      res.status(500).json({ message: "Apple callback error", error: error.message });
+    }
   }
 );
 

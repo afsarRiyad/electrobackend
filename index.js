@@ -108,7 +108,7 @@ app.use(
     },
     credentials: true, // Allow cookies and authorization headers
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "x-guest-id"],
   })
 );
 
@@ -151,24 +151,32 @@ app.get("/", (req, res) => {
       homeV3: "/api/home-v3",
       // Auth
       auth: {
-        signup: "POST /api/auth/signup",
-        login: "POST /api/auth/login",
+        signup: "POST /api/auth/signup (accepts guestId to merge guest data)",
+        login: "POST /api/auth/login (accepts guestId to merge guest data)",
         logout: "POST /api/auth/logout (Protected)",
         me: "GET /api/auth/me (Protected)",
+        mergeGuestData: "POST /api/auth/merge-guest-data (Protected, for OAuth flows)",
         forgotPassword: "POST /api/auth/forgot-password",
         resetPassword: "POST /api/auth/reset-password",
         changePassword: "PUT /api/auth/change-password (Protected)",
       },
-      // User features
+      // User features (also work for guests: send x-guest-id header or guestId in the body)
       wishlist: {
-        get: "GET /api/wishlist (Protected)",
-        add: "POST /api/wishlist (Protected)",
-        remove: "DELETE /api/wishlist/:productId (Protected)",
+        get: "GET /api/wishlist (User or guest)",
+        add: "POST /api/wishlist (User or guest)",
+        remove: "DELETE /api/wishlist/:productId (User or guest)",
       },
       compare: {
-        get: "GET /api/compare (Protected)",
-        add: "POST /api/compare (Protected)",
-        remove: "DELETE /api/compare/:productId (Protected)",
+        get: "GET /api/compare (User or guest)",
+        add: "POST /api/compare (User or guest)",
+        remove: "DELETE /api/compare/:productId (User or guest)",
+      },
+      cart: {
+        get: "GET /api/cart (User or guest)",
+        add: "POST /api/cart (User or guest)",
+        updateItem: "PUT /api/cart/:itemId (User or guest)",
+        removeItem: "DELETE /api/cart/:itemId (User or guest)",
+        clear: "DELETE /api/cart (User or guest)",
       },
       orders: {
         track: "GET /api/orders/track/:orderNumber (Public)",
